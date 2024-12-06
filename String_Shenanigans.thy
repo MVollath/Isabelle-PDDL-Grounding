@@ -2,47 +2,26 @@ theory String_Shenanigans
 imports Main
 begin
 
-type_synonym asq = string
+fun max_length :: "'a list list \<Rightarrow> nat" where
+  "max_length [] = 0" | (* yeah, yeah, technically it should be -1 or None or something *)
+  "max_length (xs # xss) = max (length xs) (max_length xss)"
 
-value "enum :: char list"
+lemma max_length_correct: "\<forall>s \<in> set ss. length s \<le> max_length ss"
+  by (induction ss) auto
 
-value "of_char (CHR 0x00) :: nat"
+definition safe_prefix :: "string list \<Rightarrow> string" where
+  "safe_prefix xs \<equiv> replicate (max_length xs + 1) (CHR ''_'')"
 
-lemma "of_char c < (256 :: int)"
-  by (metis Euclidean_Rings.pos_mod_bound of_char_mod_256 zero_less_numeral)
-
-value "char_of (88 :: nat)"
-value "[0 .. 256] :: int list"
-lemma "char_of (of_char c) = c" by simp
-lemma "(UNIV :: char set) = char_of ` (set [0 .. 256])" sorry
-
-fun ge_str :: "string \<Rightarrow> string \<Rightarrow> bool" where
-  "ge_str [] [] \<longleftrightarrow> True" |
-  "ge_str s [] \<longleftrightarrow> True" |
-  "ge_str [] s \<longleftrightarrow> False" |
-  "ge_str (x#xs) (y#ys) \<longleftrightarrow> (
-    let x' :: nat = of_char x;
-        y' :: nat = of_char y in
-    (if x' < y' then False else x' > y' \<or> ge_str xs ys)
-)"
-
-value "ge_str ''abcde'' ''bcde''"
-
-fun maxlength :: "string list \<Rightarrow> nat" where
-  "maxlength [] = 0" | (* yeah yeah it should be -1 *)
-  "maxlength (s # ss) = max (length s) (maxlength ss)"
-
-value "List.replicate 4 True"
+lemma safe_prefix_correct: "safe_prefix xs @ x \<notin> set xs"
+  using max_length_correct safe_prefix_def by force
 
 definition distinctize :: "string list \<Rightarrow> string list \<Rightarrow> string list" where
   "distinctize blocked new \<equiv>
-    (let n = maxlength blocked;
-         base = replicate (n + 1) (CHR ''_'') in
-    map (append base) new)"
+    map (append (safe_prefix blocked)) new"
 
-lemma distinctize_dist: "distinct xs \<Longrightarrow> distinct ys \<Longrightarrow> distinct (xs @ distinctize xs ys)"
-  sorry
+lemma distinctize_correct:
+  "disjnt (set blocked) (set (distinctize blocked new))"
+  by (metis (no_types, opaque_lifting) disjnt_iff distinctize_def ex_map_conv safe_prefix_correct)
 
-value "distinctize [''lmao'', ''at'', ''from''] [''xd'', ''at'']"
 
 end

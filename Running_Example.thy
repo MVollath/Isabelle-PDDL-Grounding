@@ -1,5 +1,6 @@
 theory Running_Example
-  imports PDDL_Normalization AbLa_Code "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"
+  imports PDDL_Normalization AbLa_Code Testing_Hacks
+    (*"AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"*)
 begin
 
 (*
@@ -82,9 +83,7 @@ definition "my_objs \<equiv> [
   (Obj ''t'', Either [''Train'']),
   (Obj ''p1'', Either [''Parcel'']),
   (Obj ''p2'', Either [''Parcel'']),
-  (Obj ''batmobile'', Either [''Batmobile'']),
-  (Obj ''useless'', Either [''Car'', ''Train'']),
-  (Obj ''joker'', Either [])
+  (Obj ''batmobile'', Either [''Batmobile''])
 ]"
 
 definition "my_init \<equiv> [
@@ -95,7 +94,6 @@ definition "my_init \<equiv> [
   Atom (predAtm (Pred ''at'') [Obj ''p1'', Obj ''C'']),
   Atom (predAtm (Pred ''at'') [Obj ''p2'', Obj ''F'']),
   Atom (predAtm (Pred ''at'') [Obj ''batmobile'', Obj ''E'']),
-  Atom (predAtm (Pred ''at'') [Obj ''useless'', Obj ''D'']),
   Atom (predAtm (Pred ''road'') [Obj ''A'', Obj ''D'']),
   Atom (predAtm (Pred ''road'') [Obj ''B'', Obj ''D'']),
   Atom (predAtm (Pred ''road'') [Obj ''C'', Obj ''D'']),
@@ -113,14 +111,22 @@ definition "my_problem \<equiv> Problem my_domain my_objs my_init my_goal"
 definition
   "showvals f xs \<equiv> map (\<lambda>x. (x, f x)) xs"
 
-value "wf_domain_c my_domain"
-value "wf_problem_c my_problem"
+value "assert wf_domain_c my_domain"
+value "assert wf_problem_c my_problem"
 
-
+(* type normalization debugging *)
 value "showvals (reachable_nodes my_types) my_type_names"
-value "all_supertypes my_domain (Either [])" (* empty primitives \<rightarrow> joker type *)
-value "all_supertypes my_domain (Either [''Car'', ''Parcel''])"
 value "type_preds my_domain"
+value "pred_for_type my_domain ''Car''"
+value "supertype_preds my_domain ''Car''"
+value "supertype_facts_for my_domain (my_objs ! 1)"
+value "type_precond my_domain (Var ''into'', Either [''Car'', ''Train''])"
+value "detype_ac my_domain op_load"
+value "detype_preds my_preds"
+value "detype_dom my_domain"
+value "assert wf_domain_c (detype_dom my_domain)"
+value "detype_prob my_problem"
+value "assert wf_problem_c (detype_prob my_problem)"
 
 value "of_type_c my_domain (Either []) (Either [])"
 value "of_type_c my_domain (Either []) (Either [''Car'', ''FOO''])"

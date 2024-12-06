@@ -17,11 +17,7 @@ fun only_conj :: "'a formula \<Rightarrow> bool" where
   "only_conj (_ \<^bold>\<or> _) \<longleftrightarrow> False" |
   "only_conj (_ \<^bold>\<rightarrow> _) \<longleftrightarrow> False"
 
-
-fun types_away :: "ast_problem \<Rightarrow> ast_problem" where
-  "types_away P = undefined"
-
-abbreviation "type_names D \<equiv> ''object'' # map fst (types D)"
+abbreviation "type_names D \<equiv> remdups (''object'' # map fst (types D))"
 
 (* Problem domain objs i g Domain typs preds cs acs*)
 
@@ -39,13 +35,72 @@ definition objs_single_types :: "ast_problem \<Rightarrow> bool" where
 definition restricted_pddl :: "ast_problem \<Rightarrow> bool" where
   "restricted_pddl P \<longleftrightarrow> objs_single_types P"
 
-fun type_preds where
-  "type_preds D = 
-    (let names = distinctize (map (predicate.name \<circ> pred) (predicates D)) (type_names D) in
-      map (\<lambda>n. PredDecl (Pred n) [Either [''object'']]) names)"
+definition pred_names :: "ast_domain \<Rightarrow> name list" where
+  "pred_names D = map (predicate.name \<circ> pred) (predicates D)"
 
-fun ahh where
-  "ahh D = map_of (zip (type_names D)(map (\<lambda>name. PredDecl (Pred name) [Either [''object'']]) (type_names D)))"
+fun pred_for_type :: "ast_domain \<Rightarrow> name \<Rightarrow> predicate" where
+  "pred_for_type D t = Pred (safe_prefix (pred_names D) @ t)"
+
+fun type_preds :: "ast_domain \<Rightarrow> predicate_decl list" where
+  "type_preds D = map ((\<lambda>p. PredDecl p [Either [''object'']]) \<circ> (pred_for_type D)) (type_names D)"
+
+fun supertype_preds :: "ast_domain \<Rightarrow> name \<Rightarrow> predicate list" where
+  "supertype_preds D t = map (pred_for_type D) (reachable_nodes (types D) t)"
+
+text \<open>This only works for singleton types on purpose.\<close>
+fun supertype_facts_for :: "ast_domain \<Rightarrow> (object \<times> type) \<Rightarrow> object atom formula list" where
+  "supertype_facts_for D (n, Either [t]) =
+    map (Atom \<circ> (\<lambda>p. predAtm p [n])) (supertype_preds D t)"
+
+fun type_conds :: "ast_domain \<Rightarrow> type \<Rightarrow> predicate list" where
+  "type_conds D (Either ts) = map (pred_for_type D) ts"
+
+fun disj_fmlas :: "'a formula list \<Rightarrow> 'a formula" where
+  "disj_fmlas [] = Bot" |
+  "disj_fmlas [f] = f" |
+  "disj_fmlas (f # fs) = f \<^bold>\<or> disj_fmlas fs"
+
+fun conj_fmlas :: "'a formula list \<Rightarrow> 'a formula" where
+  "conj_fmlas [] = \<^bold>\<not> \<bottom>" |
+  "conj_fmlas [f] = f" |
+  "conj_fmlas (f # fs) = f \<^bold>\<and> conj_fmlas fs"
+
+fun type_precond :: "ast_domain \<Rightarrow> (variable \<times> type) \<Rightarrow> term atom formula" where
+  "type_precond D (v, T) =
+    disj_fmlas (map (Atom \<circ> (\<lambda>p. predAtm p [term.VAR v])) (type_conds D T))"
+
+fun param_precond :: "ast_domain \<Rightarrow> (variable \<times> type) list \<Rightarrow> term atom formula" where
+  "param_precond D params = conj_fmlas (map (type_precond D) params)"
+
+definition detype_ents :: "('ent \<times> type) list \<Rightarrow> ('ent \<times> type) list" where
+  "detype_ents params \<equiv> map (\<lambda>(v, t). (v, Either [''object''])) params"
+
+fun detype_ac :: "ast_domain \<Rightarrow> ast_action_schema \<Rightarrow> ast_action_schema" where
+  "detype_ac D (Action_Schema nam params pre eff) =
+    Action_Schema nam (detype_ents params) (param_precond D params \<^bold>\<and> pre) eff"
+
+fun detype_preds :: "predicate_decl list \<Rightarrow> predicate_decl list" where
+  "detype_preds preds =
+    map (\<lambda>pd. PredDecl (pred pd) (map (\<lambda>t. Either [''object'']) (argTs pd))) preds"
+
+fun detype_dom :: "ast_domain \<Rightarrow> ast_domain" where
+  "detype_dom D = (case D of (Domain typs preds objs acs) \<Rightarrow>
+    Domain
+      []
+      (type_preds D @ detype_preds preds)
+      (detype_ents objs)
+      (map (detype_ac D) acs))"
+
+fun supertype_facts :: "ast_domain \<Rightarrow> (object \<times> type) list \<Rightarrow> object atom formula list" where
+  "supertype_facts D objs = concat (map (supertype_facts_for D) objs)"
+
+fun detype_prob :: "ast_problem \<Rightarrow> ast_problem" where
+  "detype_prob (Problem d objs i g) =
+    Problem
+      (detype_dom d)
+      (detype_ents objs)
+      (supertype_facts d objs @ supertype_facts d (consts d) @ i)
+      g"
 
 (* ------------------------------------- PROOFS ------------------------------------------------- *)
 
@@ -60,7 +115,7 @@ qed
 
 lemma wf_type_iff_listed: "ast_domain.wf_type D (Either ts) \<longleftrightarrow> (\<forall>t \<in> set ts. t \<in> set (type_names D))"
 proof -
-  have "set (type_names D) = insert ''object'' (fst ` set (types D))" by simp
+  have "set (type_names D) = insert ''object'' (fst ` set (types D))" by auto
   thus ?thesis by (simp add: ast_domain.wf_type.simps subset_code(1))
 qed
 
