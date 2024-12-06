@@ -3,8 +3,8 @@ theory PDDL_Normalization
     Graph_Funs String_Shenanigans
 begin
 
-text \<open>Even before performing normalization, we place a few restrictions on the input PDDL task.
-I am pretty sure that these aren't necessary and will only be kept in place for the MVP.\<close>
+text \<open>TODO: Even before performing normalization, we place a few restrictions on the input PDDL task.
+Some of these aren't strictly necessary and will only be kept in place for the MVP.\<close>
 
 text \<open>Check if a formula consists of only (nested) conjunctions of literals.\<close>
 fun only_conj :: "'a formula \<Rightarrow> bool" where

@@ -2,7 +2,9 @@ theory AbLa_Code
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
 begin
 
-(* _c for code *)
+text \<open>A hacky way to make the functions in PDDL_STRIPS_Semantics executable.\<close>
+
+(* suffix _c for "code" *)
 
 definition "subtype_rel_c D \<equiv> set (map prod.swap (types D))"
 

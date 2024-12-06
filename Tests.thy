@@ -5,14 +5,9 @@ theory Tests
     "Verified_SAT_Based_AI_Planning.STRIPS_Representation" *)
 begin
 
-value "(3::nat) + 7"
+text \<open>This is just a collection of random stuff. Read at your own risk.\<close>
 
 value "{(True, True)}\<^sup>*"
-
-fun swp :: "('a \<times> 'b) \<Rightarrow> ('b \<times> 'a)" where
-  "swp (a, b) = (b, a)"
-
-value "prod.swap ` {(3::nat, True), (4, False)}"
 
 lemma "(prod.swap ` s)\<^sup>* = prod.swap ` (s\<^sup>*)" oops
 lemma "r\<inverse> = prod.swap ` r" by auto

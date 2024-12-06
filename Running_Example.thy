@@ -1,18 +1,20 @@
 theory Running_Example
   imports PDDL_Normalization AbLa_Code Testing_Hacks
-    (*"AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"*)
 begin
 
-(*
-Ideally, a an example domain makes use of:
+text \<open>
+This is the PDDL problem from Helmert 2009, but modified in minor ways.
+It makes use of:
   - type hierarchy
-  - "Either" type
-  - complex preconditions
-  - eq/neq
-*)
-
-(* design issues:
-  roads aren't symmetric so the preconditions will have to be. *)
+  - parameters with Either types
+  - non-trivial preconditions
+  - multiple inheritance
+  - circular type graph
+It doesn't use:
+  - Eq in formulas
+It can't use, because I restrict that:
+  - objects/consts with Either types
+\<close>
 
 definition "my_types \<equiv> [
   (''City'', ''object''), (''Movable'', ''object''),
@@ -114,7 +116,15 @@ definition
 value "assert wf_domain_c my_domain"
 value "assert wf_problem_c my_problem"
 
-(* type normalization debugging *)
+(* Type system shenanigans *)
+value "of_type_c my_domain (Either []) (Either [])"
+value "of_type_c my_domain (Either []) (Either [''Car'', ''FOO''])"
+value "of_type_c my_domain (Either [''FOO'', ''BONK'']) (Either [''BAR'', ''FOO''])"
+value "of_type_c my_domain (Either [''R'']) (Either [''object''])"
+value "is_of_type_c my_domain (objT_c my_problem)
+  (Obj ''c1'') (Either [''Car'', ''FOO''])"
+
+(* type normalization testing *)
 value "showvals (reachable_nodes my_types) my_type_names"
 value "type_preds my_domain"
 value "pred_for_type my_domain ''Car''"
@@ -128,11 +138,7 @@ value "assert wf_domain_c (detype_dom my_domain)"
 value "detype_prob my_problem"
 value "assert wf_problem_c (detype_prob my_problem)"
 
-value "of_type_c my_domain (Either []) (Either [])"
-value "of_type_c my_domain (Either []) (Either [''Car'', ''FOO''])"
-value "of_type_c my_domain (Either [''FOO'', ''BONK'']) (Either [''BAR'', ''FOO''])"
-value "of_type_c my_domain (Either [''R'']) (Either [''object''])"
-value "is_of_type_c my_domain (objT_c my_problem)
-  (Obj ''c1'') (Either [''Car'', ''FOO''])"
+definition "my_dom_detyped \<equiv> detype_dom my_domain"
+definition "my_prob_detyped \<equiv> detype_prob my_problem"
 
 end
