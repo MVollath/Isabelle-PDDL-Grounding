@@ -17,9 +17,8 @@ fun only_conj :: "'a formula \<Rightarrow> bool" where
   "only_conj (_ \<^bold>\<or> _) \<longleftrightarrow> False" |
   "only_conj (_ \<^bold>\<rightarrow> _) \<longleftrightarrow> False"
 
+subsection \<open> Type Normalization \<close>
 abbreviation "type_names D \<equiv> remdups (''object'' # map fst (types D))"
-
-(* Problem domain objs i g Domain typs preds cs acs*)
 
 abbreviation singleton_types :: "('a \<times> type) list \<Rightarrow> bool" where
   "singleton_types os \<equiv> (\<forall>(_, t) \<in> set os. length (primitives t) = 1)"
