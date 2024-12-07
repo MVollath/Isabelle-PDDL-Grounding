@@ -2,6 +2,8 @@ theory Running_Example
   imports PDDL_Normalization AbLa_Code Testing_Hacks
 begin
 
+subsection \<open> Problem Description \<close>
+
 text \<open>
 This is the PDDL problem from Helmert 2009, but modified in minor ways.
 It makes use of:
@@ -55,14 +57,14 @@ definition "op_choochoo \<equiv> Action_Schema ''choochoo''
     [Atom (predAtm (Pred ''at'') [term.VAR (Var ''t''), term.VAR (Var ''from'')])])"
 (* into has to be Car/Train instead of Vehicle because of the definition of the predicate "in" *)
 definition "op_load \<equiv> Action_Schema ''load''
-  [(Var ''into'', Either [''Car'', ''Train'']), (Var ''what'', Either [''Parcel'']), (Var ''where'', Either [''City''])]
+  [(Var ''what'', Either [''Parcel'']), (Var ''where'', Either [''City'']), (Var ''into'', Either [''Car'', ''Train''])]
      (And (Atom (predAtm (Pred ''at'') [term.VAR (Var ''into''), term.VAR (Var ''where'')]))
          (Atom (predAtm (Pred ''at'') [term.VAR (Var ''what''), term.VAR (Var ''where'')])))
   (Effect
     [Atom (predAtm (Pred ''in'') [term.VAR (Var ''what''), term.VAR (Var ''into'')])]
     [Atom (predAtm (Pred ''at'') [term.VAR (Var ''what''), term.VAR (Var ''where'')])])"
 definition "op_unload \<equiv> Action_Schema ''unload''
-  [(Var ''from'', Either [''Car'', ''Train'']), (Var ''what'', Either [''Parcel'']), (Var ''where'', Either [''City''])]
+  [(Var ''what'', Either [''Parcel'']), (Var ''from'', Either [''Car'', ''Train'']), (Var ''where'', Either [''City''])]
      (And (Atom (predAtm (Pred ''at'') [term.VAR (Var ''from''), term.VAR (Var ''where'')]))
          (Atom (predAtm (Pred ''in'') [term.VAR (Var ''what''), term.VAR (Var ''from'')])))
   (Effect
@@ -95,7 +97,7 @@ definition "my_init \<equiv> [
   Atom (predAtm (Pred ''at'') [Obj ''t'', Obj ''E'']),
   Atom (predAtm (Pred ''at'') [Obj ''p1'', Obj ''C'']),
   Atom (predAtm (Pred ''at'') [Obj ''p2'', Obj ''F'']),
-  Atom (predAtm (Pred ''at'') [Obj ''batmobile'', Obj ''E'']),
+  Atom (predAtm (Pred ''at'') [Obj ''batmobile'', Obj ''D'']),
   Atom (predAtm (Pred ''road'') [Obj ''A'', Obj ''D'']),
   Atom (predAtm (Pred ''road'') [Obj ''B'', Obj ''D'']),
   Atom (predAtm (Pred ''road'') [Obj ''C'', Obj ''D'']),
@@ -110,11 +112,48 @@ definition "my_goal \<equiv>
 
 definition "my_problem \<equiv> Problem my_domain my_objs my_init my_goal"
 
+value "assert wf_domain_c my_domain"
+value "assert wf_problem_c my_problem"
+
+subsection \<open> Execution \<close>
+
+definition "my_plan \<equiv> [
+  PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D''],
+  PAction ''drive'' [Obj ''c1'', Obj ''D'', Obj ''C''],
+  PAction ''load'' [Obj ''p1'', Obj ''C'', Obj ''c1''],
+  PAction ''drive'' [Obj ''c1'', Obj ''C'', Obj ''D''],
+  PAction ''unload'' [Obj ''p1'', Obj ''c1'', Obj ''D''],  
+  PAction ''choochoo'' [Obj ''t'', Obj ''E'', Obj ''D''],
+  PAction ''load'' [Obj ''p1'', Obj ''D'', Obj ''t''],  
+  PAction ''choochoo'' [Obj ''t'', Obj ''D'', Obj ''E''],
+  PAction ''unload'' [Obj ''p1'', Obj ''t'', Obj ''E''],
+
+  PAction ''drive'' [Obj ''c3'', Obj ''G'', Obj ''F''],
+  PAction ''load'' [Obj ''p2'', Obj ''F'', Obj ''c3''],
+  PAction ''drive'' [Obj ''c3'', Obj ''F'', Obj ''E''],
+  PAction ''unload'' [Obj ''p2'', Obj ''c3'', Obj ''E''],
+
+  PAction ''load'' [Obj ''p1'', Obj ''E'', Obj ''c3''],
+  PAction ''drive'' [Obj ''c3'', Obj ''E'', Obj ''G''],
+  PAction ''unload'' [Obj ''p1'', Obj ''c3'', Obj ''G''],
+
+  PAction ''choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
+  PAction ''drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G'']
+]" (* Just taking the batmobile for a spin at the end, for fun. *)
+
+value "plan_action_enabled_c my_problem 
+  (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']) (set my_init)"
+value "execute_plan_action_c my_problem
+  (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D''])
+  (set my_init)"
+value "execute_plan_c my_problem my_plan (set my_init)"
+value "assert execute_plan_c my_problem my_plan (set my_init) \<^sup>c\<TTurnstile>\<^sub>\<equiv> my_goal"
+value "assert valid_plan_c my_problem my_plan"
+
 definition
   "showvals f xs \<equiv> map (\<lambda>x. (x, f x)) xs"
 
-value "assert wf_domain_c my_domain"
-value "assert wf_problem_c my_problem"
+subsection \<open> Type normalization \<close>
 
 (* Type system shenanigans *)
 value "of_type_c my_domain (Either []) (Either [])"
@@ -140,5 +179,15 @@ value "assert wf_problem_c (detype_prob my_problem)"
 
 definition "my_dom_detyped \<equiv> detype_dom my_domain"
 definition "my_prob_detyped \<equiv> detype_prob my_problem"
+
+value "plan_action_enabled_c my_prob_detyped 
+  (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']) (set (init my_prob_detyped))"
+value "execute_plan_action_c my_prob_detyped
+  (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D''])
+  (set (init my_prob_detyped))"
+value "execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped))"
+value "assert execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> my_goal"
+value "assert valid_plan_c my_prob_detyped my_plan"
+
 
 end

@@ -2,9 +2,17 @@ theory AbLa_Code
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
 begin
 
-text \<open>A hacky way to make the functions in PDDL_STRIPS_Semantics executable.\<close>
-
 (* suffix _c for "code" *)
+
+
+subsection \<open> Formulas \<close>
+
+abbreviation cw_entailment_c (infix "\<^sup>c\<TTurnstile>\<^sub>\<equiv>" 53) where
+    "M \<^sup>c\<TTurnstile>\<^sub>\<equiv> \<phi> \<equiv> valuation M \<Turnstile> \<phi>"
+
+subsection \<open> Well-Formedness \<close>
+
+text \<open>A hacky way to make the functions in PDDL_STRIPS_Semantics executable.\<close>
 
 definition "subtype_rel_c D \<equiv> set (map prod.swap (types D))"
 
@@ -104,5 +112,76 @@ definition wf_problem_c where
     \<and> wf_fmla_c (domain P) (objT_c P) (goal P)
     "
 
+subsection \<open> Execution \<close>
+
+definition "is_obj_of_type_c P n T \<equiv> case (objT_c P) n of
+    None \<Rightarrow> False
+  | Some oT \<Rightarrow> of_type_c (domain P) oT T"
+
+fun apply_effect_c :: "object ast_effect \<Rightarrow> world_model \<Rightarrow> world_model"
+  where
+     "apply_effect_c (Effect a d) s = (s - set d) \<union> (set a)"
+
+fun subst_term_c where
+    "subst_term_c psubst (term.VAR x) = psubst x"
+  | "subst_term_c psubst (term.CONST c) = c"
+
+fun instantiate_action_schema_c
+    :: "ast_action_schema \<Rightarrow> object list \<Rightarrow> ground_action"
+  where
+    "instantiate_action_schema_c (Action_Schema n params pre eff) args = (let
+        tsubst = subst_term_c (the \<circ> (map_of (zip (map fst params) args)));
+        pre_inst = (map_formula o map_atom) tsubst pre;
+        eff_inst = (map_ast_effect) tsubst eff
+      in
+        Ground_Action pre_inst eff_inst
+      )"
+
+definition resolve_action_schema_c :: "ast_domain \<Rightarrow> name \<rightharpoonup> ast_action_schema" where
+    "resolve_action_schema_c D n = index_by ast_action_schema.name (actions D) n"
+
+fun resolve_instantiate_c :: "ast_domain \<Rightarrow> plan_action \<Rightarrow> ground_action" where
+    "resolve_instantiate_c D (PAction n args) =
+      instantiate_action_schema_c
+        (the (resolve_action_schema_c D n))
+        args"
+
+definition execute_plan_action_c :: "ast_problem \<Rightarrow> plan_action \<Rightarrow> world_model \<Rightarrow> world_model"
+    where "execute_plan_action_c P \<pi> M
+      = (apply_effect_c (effect (resolve_instantiate_c (domain P) \<pi>)) M)"
+
+(* This one doesn't exist in PDDL_STRIPS_Semantics *)
+definition execute_plan_c :: "ast_problem \<Rightarrow> plan_action list \<Rightarrow> world_model \<Rightarrow> world_model"
+  where "execute_plan_c P \<pi>s s = fold (execute_plan_action_c P) \<pi>s s"
+
+definition "action_params_match_c P a args
+    \<equiv> list_all2 (is_obj_of_type_c P) args (map snd (parameters a))"
+
+fun wf_effect_inst_c :: "ast_problem \<Rightarrow> object ast_effect \<Rightarrow> bool" where
+    "wf_effect_inst_c P (Effect (a) (d))
+      \<longleftrightarrow> (\<forall>a\<in>set a \<union> set d. wf_fmla_atom_c (domain P) (objT_c P) a)"
+
+fun wf_plan_action_c :: "ast_problem \<Rightarrow> plan_action \<Rightarrow> bool" where
+    "wf_plan_action_c P (PAction n args) = (
+      case resolve_action_schema_c (domain P) n of
+        None \<Rightarrow> False
+      | Some a \<Rightarrow>
+          action_params_match_c P a args
+        \<and> wf_effect_inst_c P (effect (instantiate_action_schema_c a args))
+        )"
+
+(* this isn't used in any function in the original theory*)
+definition plan_action_enabled_c :: "ast_problem \<Rightarrow> plan_action \<Rightarrow> world_model \<Rightarrow> bool" where
+    "plan_action_enabled_c P \<pi> M
+      \<longleftrightarrow> wf_plan_action_c P \<pi> \<and> M \<^sup>c\<TTurnstile>\<^sub>\<equiv> precondition (resolve_instantiate_c (domain P) \<pi>)"
+
+(* this is highly modified from the original *)
+fun valid_plan_from_c :: "ast_problem \<Rightarrow> world_model \<Rightarrow> plan \<Rightarrow> bool" where
+    "valid_plan_from_c P M [] = M \<^sup>c\<TTurnstile>\<^sub>\<equiv> (goal P)" |
+    "valid_plan_from_c P M (\<pi> # \<pi>s) = (plan_action_enabled_c P \<pi> M \<and>
+      valid_plan_from_c P (execute_plan_action_c P \<pi> M) \<pi>s)"
+
+definition valid_plan_c :: "ast_problem \<Rightarrow> plan \<Rightarrow> bool" where
+  "valid_plan_c P \<pi>s \<equiv> valid_plan_from_c P (set (init P)) \<pi>s" 
 
 end
