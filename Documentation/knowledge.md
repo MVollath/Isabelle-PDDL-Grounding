@@ -82,7 +82,7 @@
 	- Axioms "stratifiable" (valid) iff: There exists a total preorder over predicates such that $\forall Q, P: Q\in\varphi\land P\in\psi\Longrightarrow Q\succeq P$. Even $Q \succ P$ if $P$ is negated in the NNF of $\psi$.
 	- Stratifiability necessary for axiom evaluation. $P \prec Q$ means $P$ is not dependent on $Q$, and is thus evaluated first.
 	- Fluent predicates (occur in effects/init) must not appear in axiom heads.
-- PDDL task: $\langle$init, goal, axioms, operators$\rangle$. Predicates including their arity are implicitly defined. Types not explicitly part of this formalism, but still supported by normalization later.
+- PDDL task: $\langle$ init, goal, axioms, operators $\rangle$. Predicates including their arity are implicitly defined. Types not explicitly part of this formalism, but still supported by normalization later.
 
 **Finite-Domain Representation FDR**
 - Based on SAS<sup>+</sup> with axioms and conditional effects.
@@ -107,7 +107,7 @@ $\mathit{A\\\_effects}(\cdot)\leftarrow\mathit{A\\\_applicable}(\cdot)$
 
 **Datalog rule decomposition**
 * Join decomposition: If $q_1(\cdot), q_2(\cdot)\in\mathit{body}$, create new predicate with rule $\mathit{temp}(\cdot)\leftarrow q_1(\cdot), q_2(\cdot)$.
-* Projection: Find an atom $q$ in a body that uses a variable $v$ unused elsewhere in the rule, then add $\mathit{temp}(\cdot\backslash v)\leftarrow q(\cdot)$. This reduces variable count by essentially resolving existential qualifiers. E.g.:$Q(\mathit{room})\leftarrow\mathit{holding}(\mathit{box}),\mathit{at}(\mathit{room})$ is simplified by introducing $\mathit{holding\\\_any\\\_box}()\leftarrow\mathit{holding}(\mathit{box})$
+* Projection: Find an atom $q$ in a body that uses a variable $v$ unused elsewhere in the rule, then add $\mathit{temp}(\cdot\backslash v)\leftarrow q(\cdot)$. This reduces variable count by essentially resolving existential qualifiers. E.g.: $Q(\mathit{room})\leftarrow\mathit{holding}(\mathit{box}),\mathit{at}(\mathit{room})$ is simplified by introducing $\mathit{holding\\\_any\\\_box}()\leftarrow\mathit{holding}(\mathit{box})$
 * Problem: how to choose joins. Helmert chooses atoms with many variables.
 
 ### <ins>Correa</ins>
