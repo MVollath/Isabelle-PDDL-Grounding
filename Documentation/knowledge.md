@@ -51,6 +51,9 @@
 - Lifschitz 1987: [On the Semantics of STRIPS]( https://www.semanticscholar.org/paper/ON-THE-SEMANTICS-OF-STRIPS-Lifschitz/83eb0f04037344fde93b3213b790c7824ca09079)
 	- Formal definition of STRIPS Semantics, very close to AI_Planning_Languages_Semantics
 
+### probably not
+- S. Edelkamp, M. Helmert, Exhibiting knowledge in planning problems to minimize state encoding length
+	- earlier grounder by Helmert, to STRIPS. Almost same output format as my project
 
 # Citation Needed
 - For every clique, in any tree decomposition, there exists a bag where clique $\subseteq$ bag. Thus, the variable set of any rule can be assigned to a bag.
@@ -58,15 +61,80 @@
 
 # Source Notes
 ## Main Sources
-### Helmert
+### <ins>Helmert</ins>
 - [ ] detailed dissection currently at **6. Grounding**
-- Helmert's effects can have nested effects and $\forall$-quantification
-### Correa
+- *Fast Downward* (FD) planning system
+- Good running example: delivery problem
+- Propositional STRIPS exactly like my previous project. States are sets of true atoms. Ab+Ku only introduces neagtive atoms in the goal.
+- SAT-based solvers apparently prefer finite-doain inputs over STRIPS
+- **"Invariant synthesis and grounding are not related to one another and could just as well be performed in the opposite order."**
+- My project: Task generation is final step and generates STRIPS instead of FDR. Afterwards (outlook?), invariant synthesis may be used to turn binary variables into FD ones.
+
+**PDDL format**
+- PDDL format 2.2 "level 1": non-numerical, non-temporal fragment of PDDL
+- Operators $\langle \chi, e\rangle$. Precondition, effect
+	- Effects can have nested conditions and $\forall$-quantification. Example syntax: $\forall x: (\mathit{is\_wet}\  x) \triangleright (\neg\mathit{burns}\ x)$
+	- Operator parameters are the free variables of precondition $\chi$ and effect $e$.
+- Axioms $\varphi\leftarrow\psi$: Derive predicates that are automatically updated.
+	- $\varphi$ is an atom, $\psi$ a formula.
+	- Axioms have to be safe: $\mathit{free}\ \psi\subseteq\mathit{free}\ \varphi$
+	- Axioms "stratifiable" (valid) iff: There exists a total preorder over predicates such that $\forall Q, P: Q\in\varphi\land P\in\psi\Longrightarrow Q\succeq P$. Even $Q \succ P$ if $P$ is negated in the NNF of $\psi$.
+	- Stratifiability necessary for axiom evaluation. $P \prec Q$ means $P$ is not dependent on $Q$, and is thus evaluated first.
+	- Fluent predicates (occur in effects/init) must not appear in axiom heads.
+- PDDL task: $\langle$init, goal, axioms, operators$\rangle$. Predicates including their arity are implicitly defined. Types not explicitly part of this formalism, but still supported by normalization later.
+
+**Finite-Domain Representation FDR**
+- Based on SAS<sup>+</sup> with axioms and conditional effects.
+- A grounded planning format where variables are not binary. Instead, every variable has a respective finite and discrete domain.
+- Formulas only have conjunctions
+- No nexted conditional effects
+- Axioms $\mathit{cond}\rightarrow\mathit{var}:=\mathit{val}$
+	- $\mathit{cond}$ is just a partial assignment
+	- Derived variables' domains contain default value $\bot$
+	- Axiom layering: Each axiom part of a "layer". Bottom axiom layer evaluated first, then next and so on. Values can be overriden in higher layers, but not in the same layer.
+	- No contradictions within same layer: If $v:=d$ is in a head, $v$ must not appear in the same layer with any other value than $d$, even in bodies.
+- State space is directed graph. Node is state, edge is transition.
+
+**Normalization**
+- Compile away types: A tiny bit easier for me because we don't allow $\forall$ in effects.
+- Goal must be conjunction: **Axioms required to compile disjunctions into conjunctions**, but we can use auxiliary operators too.
+- For preconditions, turn formula into CNF then split into multiple operators across disjunctions. **NNF may be enough due to properties of STRIPS formulas, then no need to split operators.**
+
+**Datalog generation**
+- straight forward. $\mathit{A\_applicable}(\cdot)\leftarrow\mathit{A\_pre}(\cdot)$
+$\mathit{A\_effects}(\cdot)\leftarrow\mathit{A\_applicable}(\cdot)$
+
+**Datalog rule decomposition**
+* Join decomposition: If $q_1(\cdot), q_2(\cdot)\in\mathit{body}$, create new predicate with rule $\mathit{temp}(\cdot)\leftarrow q_1(\cdot), q_2(\cdot)$.
+* Projection: Find an atom $q$ in a body that uses a variable $v$ unused elsewhere in the rule, then add $\mathit{temp}(\cdot\backslash v)\leftarrow q(\cdot)$. This reduces variable count by essentially resolving existential qualifiers. E.g.:$Q(\mathit{room})\leftarrow\mathit{holding}(\mathit{box}),\mathit{at}(\mathit{room})$ is simplified by introducing $\mathit{holding\_any\_box}()\leftarrow\mathit{holding}(\mathit{box})$
+* Problem: how to choose joins. Helmert chooses atoms with many variables.
+
+### <ins>Correa</ins>
 - [x] fully dissected
 - (**double check**) Can ground more problems in total because of good space efficiency, but is comparatively time inefficient.
 - Iterated<sup>≠</sup> is confusing...
+- TODO copy rest of my notes here
 
-### Ab+La
+**Rule Decomposition**
+- Simple join/projection decompositions: "different choices on how to decompose rules will lead to a different number of temporary predicates." Correa claims preferring atoms with few variables yields better results, whereas Helmert prefers atoms with many variables (page 3 footnote 2).
+- Can use tree decomposition instead.
+- lpopt generates "n new rules": Probably a mistake, you need more rules for disjunctions.
+
+**iterated**
+- Avoid grounding actions at first by skilling applicability rules and instead directly feeding into action effect rules ("simplified" problem),
+- This only immediately generates reachable atoms, not ground actions.
+- Trivial solution: unify preconditions and explode exponentially
+- Actual solution: iterated solving: Solve the simplified problem, obtain solution $\mathcal M$. For every action, create new program with facts $\mathcal F := \mathcal M$ and "choice rules".
+- **TODO clean this up:** encode type predicates as $\mathbf1\{V_i-\mathit{assign}(x):\mathit{type\_T}(x)\}\mathbf1$. If no type predicates, I think you can choose any unary pred from the body.
+For non-ground atom $q_i$ in body with variables $V_{\dots k}$ create $\bot\leftarrow \mathit{v_1\_assign}(x_1), \dots, \mathit{v_k\_assign}(x_k), \neg q_i(x_1, \dots, x_k)$.
+But how can he use negation? Is it not Datalog but ASP/stratified Datalog?
+- Each stable model is then one ground action. Iteratively solve and enumerate all of them.
+
+**iterated<sup>≠</sup>**
+- "negated static predicates" why is ≠ negated? It can just be a predicate, why would FD not already consider it in the simplified problem?
+→ Inequalities only considered in second phase (action enumeration) because of tree with. This is probably why they receive special treatment.
+
+### <ins>Ab+La</ins>
 - [x] fully dissected code
 - [ ] fully dissected paper
 
@@ -90,11 +158,11 @@
 - SAS<sup>+</sup> effects have, in addition to regular effect conditions, specific preconditions for a modified variable's previous value. Affect whether the entire operator is enabled, weirdly enough. Apparently leftover relic.
 - Execution can be undefined, yet `lookup_operator` bothers with returning `optional`
 
-### Isabelle Datalog
+### <ins>Isabelle Datalog</ins>
 - [ ] fully dissected
 - Stratified Datalog, meaning there are negations, so it's a bit unnecessarily complicated.
 
-### Ab+Ku
+### <ins>Ab+Ku</ins>
 - [x] fully dissected
 
 **State-Var Rep**
@@ -121,25 +189,25 @@
 - function graph logic `[(x, f x), ...]`. Might prove useful for translating modified actions...
 
 ## Tree Decomposition
-### lpopt
+### <ins>lpopt</ins>
 - [ ] fully dissected
 - tree decomposition heuristics: Default MIW (minimum-degree elimination) ✓, MCS (maximum-cardinality search) ✓, MF (minimum-fill) ✓, NOA (natural) (?).
 - decompositions implemented in htd library
-### htd
+### <ins>htd</ins>
 - [ ] fully dissected
 - NaturalOrderingAlgorithm does nothing?
-### Metaheuristic Algorithms and Tree Decomposition
+### <ins>Metaheuristic Algorithms and Tree Decomposition</ins>
 - [ ] fully dissected
 - Describes MIN-DEGREE, MCS, min-fill
-### Heuristic Methods for Hypertree Decomposition
+### <ins>Heuristic Methods for Hypertree Decomposition</ins>
 - [ ] fully dissected
 - used in Dermaku: MCS, min-fill, (min-induced-width)
-### NetworkX
+### <ins>NetworkX</ins>
 - [ ] fully dissected
 - "The [min-degree] heuristic chooses the nodes according to their degree, i.e., first the node with the lowest degree is chosen, then the graph is updated and the corresponding node is removed. Next, a new node with the lowest degree is chosen, and so on."
 
 ## minor
-### Lifschitz
+### <ins>Lifschitz</ins>
 - [x] fully dissected
 - like the definition of PDDL-STRIPS in Ab+La but unclear if everything is grounded or not
 	- Allow for arbitrary, even quantified formulas in world model, so long as they can never be invalidated (=invariants)

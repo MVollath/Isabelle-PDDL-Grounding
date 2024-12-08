@@ -8,3 +8,4 @@ A verified Isabelle implementation of the grounder in [Helmert 2009](https://www
 
 ### Repository Walkthrough
 - Documentation folder contains a detailed plan of the project, an organized list of sources, and many notes.
+- TODO ...

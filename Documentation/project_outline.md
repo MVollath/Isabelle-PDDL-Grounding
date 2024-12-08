@@ -10,6 +10,7 @@
 
 ## Code project:
 - [x] Input: PDDL (Ab+La)
+	- non-numerical, non-temporal fragment. TODO: is it most similar to *PDDL 2.1, level 1*?
 	- doesn't support: axioms, $\exists,\forall$-quantified formulas, effects with nested conditions and $\forall$-quantification
 	- does add: either types, multiple inheritance, cyclic type-dependencies
 - [ ] subset of PDDL used as input to grounder
