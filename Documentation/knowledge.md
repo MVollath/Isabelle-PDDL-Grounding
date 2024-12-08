@@ -10,6 +10,7 @@
 **Ab+La**
 - Where is the PDDL parser?
 - "flat type hierarchy"?
+
 **Orga**
 - Can this project become part of the AFP? What would I need to watch out for? Can something be in AFP with external dependencies (Datalog formalization is not in AFP)?
 # Dependencies (tentative):
@@ -73,7 +74,7 @@
 **PDDL format**
 - PDDL format 2.2 "level 1": non-numerical, non-temporal fragment of PDDL
 - Operators $\langle \chi, e\rangle$. Precondition, effect
-	- Effects can have nested conditions and $\forall$-quantification. Example syntax: $\forall x: (\mathit{is\_wet}\  x) \triangleright (\neg\mathit{burns}\ x)$
+	- Effects can have nested conditions and $\forall$-quantification. Example syntax: $\forall x: (\mathit{is\\\_wet}\  x) \triangleright (\neg\mathit{burns}\ x)$
 	- Operator parameters are the free variables of precondition $\chi$ and effect $e$.
 - Axioms $\varphi\leftarrow\psi$: Derive predicates that are automatically updated.
 	- $\varphi$ is an atom, $\psi$ a formula.
@@ -101,12 +102,12 @@
 - For preconditions, turn formula into CNF then split into multiple operators across disjunctions. **NNF may be enough due to properties of STRIPS formulas, then no need to split operators.**
 
 **Datalog generation**
-- straight forward. $\mathit{A\_applicable}(\cdot)\leftarrow\mathit{A\_pre}(\cdot)$
-$\mathit{A\_effects}(\cdot)\leftarrow\mathit{A\_applicable}(\cdot)$
+- straight forward. $\mathit{A\\\_applicable}(\cdot)\leftarrow\mathit{A\\\_pre}(\cdot)$
+$\mathit{A\\\_effects}(\cdot)\leftarrow\mathit{A\\\_applicable}(\cdot)$
 
 **Datalog rule decomposition**
 * Join decomposition: If $q_1(\cdot), q_2(\cdot)\in\mathit{body}$, create new predicate with rule $\mathit{temp}(\cdot)\leftarrow q_1(\cdot), q_2(\cdot)$.
-* Projection: Find an atom $q$ in a body that uses a variable $v$ unused elsewhere in the rule, then add $\mathit{temp}(\cdot\backslash v)\leftarrow q(\cdot)$. This reduces variable count by essentially resolving existential qualifiers. E.g.:$Q(\mathit{room})\leftarrow\mathit{holding}(\mathit{box}),\mathit{at}(\mathit{room})$ is simplified by introducing $\mathit{holding\_any\_box}()\leftarrow\mathit{holding}(\mathit{box})$
+* Projection: Find an atom $q$ in a body that uses a variable $v$ unused elsewhere in the rule, then add $\mathit{temp}(\cdot\backslash v)\leftarrow q(\cdot)$. This reduces variable count by essentially resolving existential qualifiers. E.g.:$Q(\mathit{room})\leftarrow\mathit{holding}(\mathit{box}),\mathit{at}(\mathit{room})$ is simplified by introducing $\mathit{holding\\\_any\\\_box}()\leftarrow\mathit{holding}(\mathit{box})$
 * Problem: how to choose joins. Helmert chooses atoms with many variables.
 
 ### <ins>Correa</ins>
@@ -125,8 +126,8 @@ $\mathit{A\_effects}(\cdot)\leftarrow\mathit{A\_applicable}(\cdot)$
 - This only immediately generates reachable atoms, not ground actions.
 - Trivial solution: unify preconditions and explode exponentially
 - Actual solution: iterated solving: Solve the simplified problem, obtain solution $\mathcal M$. For every action, create new program with facts $\mathcal F := \mathcal M$ and "choice rules".
-- **TODO clean this up:** encode type predicates as $\mathbf1\{V_i-\mathit{assign}(x):\mathit{type\_T}(x)\}\mathbf1$. If no type predicates, I think you can choose any unary pred from the body.
-For non-ground atom $q_i$ in body with variables $V_{\dots k}$ create $\bot\leftarrow \mathit{v_1\_assign}(x_1), \dots, \mathit{v_k\_assign}(x_k), \neg q_i(x_1, \dots, x_k)$.
+- **TODO clean this up:** encode type predicates as $\mathbf1\{V_i-\mathit{assign}(x):\mathit{type\\\_T}(x)\}\mathbf1$. If no type predicates, I think you can choose any unary pred from the body.
+For non-ground atom $q_i$ in body with variables $V_{\dots k}$ create $\bot\leftarrow \mathit{v_{1}\\\_ assign}(x_1), \dots, \mathit{v_k\\\_assign}(x_k), \neg q_i(x_1, \dots, x_k)$.
 But how can he use negation? Is it not Datalog but ASP/stratified Datalog?
 - Each stable model is then one ground action. Iteratively solve and enumerate all of them.
 
