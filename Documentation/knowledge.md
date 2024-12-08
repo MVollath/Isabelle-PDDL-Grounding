@@ -101,7 +101,7 @@
 - For preconditions, turn formula into CNF then split into multiple operators across disjunctions. **NNF may be enough due to properties of STRIPS formulas, then no need to split operators.**
 
 **Datalog generation**
-- straight forward. $\mathit{A\_applicable}(\cdot)\leftarrow\mathit{A\_pre}(\cdot)$
+- straight forward. $\mathit{A\\\_applicable}(\cdot)\leftarrow\mathit{A\_pre}(\cdot)$
 $\mathit{A\_effects}(\cdot)\leftarrow\mathit{A\_applicable}(\cdot)$
 
 **Datalog rule decomposition**
