@@ -101,6 +101,8 @@ fun detype_prob :: "ast_problem \<Rightarrow> ast_problem" where
       (supertype_facts d objs @ supertype_facts d (consts d) @ i)
       g"
 
+
+
 (* ------------------------------------- PROOFS ------------------------------------------------- *)
 
 

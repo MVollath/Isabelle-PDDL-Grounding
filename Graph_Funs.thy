@@ -29,6 +29,7 @@ fun reach_aux_aux :: "('a \<times> 'a) list \<Rightarrow> ('a \<times> 'a) list 
       (upd_all R r_ls l_rs)
       (upd_all L l_rs r_ls))"
 
+text \<open> TODO: use mapping instead of lambda! \<close>
 abbreviation reachable_nodes :: "('a \<times> 'a) list \<Rightarrow> 'a \<Rightarrow> 'a list" where
   "reachable_nodes rel \<equiv> reach_aux rel (\<lambda>x. [x]) (\<lambda>x. [x])"
 

@@ -1,9 +1,8 @@
-
 # Project Outline
 ## Formats
 - Helmert PDDL format
 - Ab+La PDDL format
-- My restricted PDDL: Helmert ∩ Ab+La
+- My restricted PDDL: Helmert ∩ Ab+La \ MVP restrictions
 - Datalog
 - (ground PDDL)
 - Helmert propositional STRIPS format
@@ -11,10 +10,12 @@
 
 ## Code project:
 - [x] Input: PDDL (Ab+La)
-	- doesn't support: axioms, quantified formulas, effects with nested conditions and $\forall$-quantification
-- [x] subset of PDDL used as input to grounder
+	- doesn't support: axioms, $\exists,\forall$-quantified formulas, effects with nested conditions and $\forall$-quantification
+	- does add: either types, multiple inheritance, cyclic type-dependencies
+- [ ] subset of PDDL used as input to grounder
 	- MVP: no disjunctions in goal formula
 	- MVP: objects/consts must have primitive types. I likely won't lift this restriction.
+	- MVP: in Ab+La, action signature types aren't checked for  well-formedness. This complicates preconditions for type normalization.
 - [x] Running example (delivery planning problem)
 - [ ] Normalization of PDDL
 	- [x] Define normalized PDDL: no types, preconditions are conjunctions, (goal is conjunction)
@@ -22,11 +23,19 @@
 	- [ ] Type normalization:
 		- [x] Algorithm
 		- [ ] Proof
-			- [ ] ...
+			- [ ] well-formedness
+			- [ ] OG init subset of detyped init, goal unchanged
+			- [ ] static predicates
+			- [ ] type predicates are static
+			- [ ] OG plan action well-formed $\Longleftrightarrow$ detyped plan action well-formed and type preconds satisfied
+			- [ ] OG plan action enabled and well-formed $\Longleftrightarrow$ detyped plan-action enabled and well-formed
+			- [ ] OG plan action from s to s' $\Longleftrightarrow$ detyped plan action from (s + type preds) to (s' + type preds)
+			- [ ] OG plan action solves $\Longleftrightarrow$ detyped plan action solves
 	- [ ] Precond normalization:
 		- [ ] Definition of NNF
 		- [ ] Algorithm
 		- [ ] Proof ...
+		- Maybe Ab+Ku's CNF logic is useful here.
 	- [ ] Putting it together
 - [ ] Relaxed-Reachability
 	- [ ] Define "relaxed" PDDL: no negative effects or preconditions
@@ -51,6 +60,8 @@
 		- [ ] Prove equivalence
 - [ ] Output: STRIPS (Ab+Ku)
 	- Helmert's output is SAS<sup>+</sup>, but I omit the necessary step *invariant synthesis*.
+	- [ ] Remove any duplicates in add/del, as Ab+Ku doesn't allow them.
+	- [ ] Don't forget that in Ab+Ku, if an operator is not enabled, it does NOOP
 
 ### Improvements to MVP
 
@@ -61,6 +72,9 @@
 	- [ ] MVP: pipe into external solver
 	- [ ] maybe: chose heuristic, implement decomposition algorithm in Isabelle
 		- But first search through Isabelle Graph Library for applicable tools
+- [ ] pipe STRIPS instance into Ab+Ku's solver
+- [ ] allow disjunctions in PDDL goal formulas
+	- [ ] compille into conjunctive goal formulas by introducing auxiliary actions and predicates
 - [ ] *iterated*
 	- Start with decomposed Datalog program
 	- [ ] remove applicability rules
@@ -72,3 +86,9 @@
 		- [ ] piping ...
 - [ ] *iterated*<sup>≠</sup>
 	- [ ] Understand it in the first place lmao
+- [ ] Support non-primitive consts/objects
+	- lowest priority
+
+### Outlook
+- Modify PDDL formalization to support: axioms, $\exists,\forall$-quantified formulas, effects with nested conditions and  ∀-quantification, as in Helmert
+- Implement invariant synthesis to change output from STRIPS to a finite-domain representation like SAS<sup>+</sup>
