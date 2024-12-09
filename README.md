@@ -7,5 +7,12 @@ A verified Isabelle implementation of the grounder in [Helmert 2009](https://www
  - [LTS-formalization](https://github.com/anderssch/LTS-formalization): a formalization of Datalog, a language used for reachability analysis. Until I figure out how to do imports better, this has to be in the same folder as my repository, and be named "LTS-formalization".
 
 ### Repository Walkthrough
-- Documentation folder contains a detailed plan of the project, an organized list of sources, and many notes.
-- TODO ...
+```
+Repository
+├── Documentation
+│   ├── knowledge.md - - - - - - Organize list of sources, many notes
+│   └── project_outline.md - - - Detailed plan of the project
+├── Running_Example.thy  - - - - Full project demonstration
+├── Milestones.thy - - - - - - - Milestone lemmas to gauge the project process
+└── TODO ...
+```

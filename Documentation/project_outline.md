@@ -15,7 +15,7 @@
 	- does add: either types, multiple inheritance, cyclic type-dependencies
 - [ ] subset of PDDL used as input to grounder
 	- MVP: no disjunctions in goal formula
-	- MVP: objects/consts must have primitive types. I likely won't lift this restriction.
+	- MVP?: objects/consts must have primitive types. I likely won't lift this restriction.
 	- MVP: in Ab+La, action signature types aren't checked for  well-formedness. This complicates preconditions for type normalization.
 - [x] Running example (delivery planning problem)
 - [ ] Normalization of PDDL
@@ -76,6 +76,7 @@
 - [ ] pipe STRIPS instance into Ab+Ku's solver
 - [ ] allow disjunctions in PDDL goal formulas
 	- [ ] compille into conjunctive goal formulas by introducing auxiliary actions and predicates
+- [ ] Add goal rule do Datalog program. If that atom isn't enabled by the canonical model, don't even bother grounding the task.
 - [ ] *iterated*
 	- Start with decomposed Datalog program
 	- [ ] remove applicability rules
@@ -92,4 +93,6 @@
 
 ### Outlook
 - Modify PDDL formalization to support: axioms, $\exists,\forall$-quantified formulas, effects with nested conditions and  ∀-quantification, as in Helmert
-- Implement invariant synthesis to change output from STRIPS to a finite-domain representation like SAS<sup>+</sup>
+- Implement invariant synthesis to change output from STRIPS to a finite-domain representation like SAS<sup>+</sup> (Ab+La's SAS<sup>+</sup> supports axioms)
+- (I believe you can consider types in the datalog translation, so you have to generate fewer rules when esuring rule safety. Like for $H(x, y)\leftarrow P(x)$, you would only have to generate $H(x, y_k)\leftarrow\dots$ for those $y_k$ for which the type matches.)
+**nvm** i think rule safety is ensured differently

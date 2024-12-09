@@ -101,11 +101,20 @@ fun detype_prob :: "ast_problem \<Rightarrow> ast_problem" where
       (supertype_facts d objs @ supertype_facts d (consts d) @ i)
       g"
 
+definition typeless_dom :: "ast_domain \<Rightarrow> bool" where
+  "typeless_dom D = undefined"
 
+definition typeless_prob :: "ast_problem \<Rightarrow> bool" where
+  "typeless_prob P = undefined"
+
+subsection \<open>Complete Normalization\<close>
+
+definition normalized_prob :: "ast_problem \<Rightarrow> bool" where
+  "normalized_prob P \<equiv> typeless_prob P \<and> undefined"
 
 (* ------------------------------------- PROOFS ------------------------------------------------- *)
 
-
+(* properties of Ab+La *)
 
 lemma subtype_edge_swap: "ast_domain.subtype_edge = prod.swap"
 proof -
@@ -113,6 +122,8 @@ proof -
     by (simp add: ast_domain.subtype_edge.simps)
   thus ?thesis by fast
 qed
+
+(* supertype enumeration *)
 
 lemma wf_type_iff_listed: "ast_domain.wf_type D (Either ts) \<longleftrightarrow> (\<forall>t \<in> set ts. t \<in> set (type_names D))"
 proof -
@@ -162,6 +173,26 @@ lemma simple_obj_of_type_iff:
       (\<exists>t \<in> set (primitives T).
     t \<in> set (reachable_nodes (types (domain P)) ot))"
   using assms ast_problem.is_obj_of_type_def single_of_type_iff by auto
+
+(* type normalization well-formed *)
+
+(* Ziel für 12.12. *)
+theorem "ast_domain.wf_domain D \<Longrightarrow> ast_domain.wf_domain (detype_dom D)"
+  oops
+
+lemma "ast_problem.wf_problem P \<Longrightarrow> ast_problem.wf_problem (detype_prob P)"
+  oops
+
+lemma "ast_domain.wf_domain D \<Longrightarrow> typeless_dom (detype_dom D)"
+  oops
+
+lemma "ast_problem.wf_problem P \<Longrightarrow> typeless_prob (detype_prob P)"
+  oops
+
+(* type normalization correct w.r.t. execution*)
+
+lemma "ast_problem.valid_plan P \<pi> \<Longrightarrow> ast_problem.valid_plan (detype_prob P) \<pi>"
+  oops
 
 
 section \<open> Context setup that I'm totally gonna use eventually \<close>
