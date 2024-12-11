@@ -10,7 +10,7 @@ A verified Isabelle implementation of the grounder in [Helmert 2009](https://www
 ```
 Repository
 ├── Documentation
-│   ├── knowledge.md - - - - - - Organize list of sources, many notes
+│   ├── knowledge.md - - - - - - Organized list of sources, many notes
 │   └── project_outline.md - - - Detailed plan of the project
 ├── Running_Example.thy  - - - - Full project demonstration
 ├── Milestones.thy - - - - - - - Milestone lemmas to gauge the project process

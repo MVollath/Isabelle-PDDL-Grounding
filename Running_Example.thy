@@ -113,6 +113,8 @@ definition "my_goal \<equiv>
 definition "my_problem \<equiv> Problem my_domain my_objs my_init my_goal"
 
 value "assert wf_domain_c my_domain"
+lemma "wf_domain_c my_domain" by eval
+
 value "assert wf_problem_c my_problem"
 
 subsection \<open> Execution \<close>

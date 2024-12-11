@@ -6,6 +6,8 @@
 - What does `declare my_lemma [code]` do? Why would a lemma be turned into SML?
 - What does `context fixes ty_ent` do if context has no name?
 - `no_notation my_fun (infixl "+" 65)`?
+- Why does the automatic solver hate my wf-lemmas?
+- how to unfold a function from "myfun (data x y) = x ..." to "myfun z = data.left x"?
 
 **Ab+La**
 - Where is the PDDL parser?
