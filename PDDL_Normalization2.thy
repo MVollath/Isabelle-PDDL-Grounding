@@ -1,0 +1,610 @@
+theory PDDL_Normalization2
+  imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
+    Utils Graph_Funs String_Shenanigans
+begin
+
+subsection \<open> Input Restriction \<close>
+
+text \<open>Even before performing normalization, we place a few restrictions on the input PDDL task.
+Some of these aren't strictly necessary and will only be kept in place for the MVP:
+* Restrict consts/objects to primitive types only. This isn't strictly necessary but saves me a lot
+  of work, especially since I couldn't find any PDDL planning task that makes use of objects with
+  Either types. (domain and problem)
+* MVP: No disjunctions in goal formula: Our output format does not allow axioms, and I don't want
+  to generate auxiliary actions during normalization. (problem)
+* (maybe) check action signature types for well-formedness. (domain)\<close>
+
+text \<open>Check if a formula consists of only (nested) conjunctions of literals.\<close>
+abbreviation singleton_types :: "('a \<times> type) list \<Rightarrow> bool" where
+  "singleton_types os \<equiv> (\<forall>(_, t) \<in> set os. length (primitives t) = 1)"
+
+context ast_domain
+begin
+  (* Omitting this from wf_action_schema is a little annoying for me *)
+  definition wf_action_params :: "ast_action_schema \<Rightarrow> bool" where
+    "wf_action_params a \<equiv> (\<forall>t \<in> snd ` (set (parameters a)). wf_type t)"
+  
+  definition restrict_dom :: bool where
+    "restrict_dom \<equiv> singleton_types (consts D)
+                    \<and> (\<forall>a\<in>set (actions D). wf_action_params a)"
+end
+
+locale restr_domain = wf_ast_domain +
+  assumes restrD: restrict_dom
+begin
+  (* this is the most important and most referenced property restriction *)
+  lemma single_t_cnsts: "singleton_types (consts D)"
+    apply unfold_locales
+    using restrD by (auto simp add: restrict_dom_def)
+end
+
+context ast_problem
+begin
+  definition restrict_prob :: bool where
+    "restrict_prob \<equiv> restrict_dom
+                  \<and> singleton_types (objects P)
+                  \<and> only_conj (goal P)"
+end
+
+locale restr_prob = wf_ast_problem +
+  assumes restrP: restrict_prob
+begin
+  sublocale restr_domain "domain P"
+    apply unfold_locales
+    using restrP
+    unfolding restrict_prob_def by simp
+
+  lemma single_t_cnsts: "singleton_types (objects P)"
+    apply unfold_locales
+    using restrP by (auto simp add: restrict_dom_def restrict_prob_def)
+end
+
+subsection \<open>Type Normalization\<close>
+
+(* TODO think of a better name *)
+abbreviation "\<omega> \<equiv> Either [''object'']"
+
+context ast_domain
+begin
+
+  (* if multiple inheritance exists, there are duplicates *)
+  definition "type_names \<equiv> remdups (''object'' # map fst (types D))"
+  
+  definition pred_names :: "name list" where
+    "pred_names = map (predicate.name \<circ> pred) (predicates D)"
+  
+  fun pred_for_type :: "name \<Rightarrow> predicate" where
+    "pred_for_type t = Pred (safe_prefix pred_names @ t)"
+  
+  definition type_preds :: "predicate_decl list" where
+    "type_preds \<equiv> map ((\<lambda>p. PredDecl p [\<omega>]) \<circ> pred_for_type) type_names"
+
+  abbreviation supertypes_of :: "name \<Rightarrow> name list" where
+    "supertypes_of \<equiv> reachable_nodes (types D)"
+
+  fun supertype_preds :: "name \<Rightarrow> predicate list" where
+    "supertype_preds t = map pred_for_type (supertypes_of t)"
+  
+  text \<open>This only works for singleton types on purpose.\<close>
+  fun supertype_facts_for :: "(object \<times> type) \<Rightarrow> object atom formula list" where
+    "supertype_facts_for (n, Either [t]) =
+      map (Atom \<circ> (\<lambda>p. predAtm p [n])) (supertype_preds t)" |
+    "supertype_facts_for (n, _) = undefined"
+
+  (* TODO sugar *)
+  fun type_conds :: "type \<Rightarrow> predicate list" where
+    "type_conds t = map pred_for_type (primitives t)"
+  
+  fun type_precond :: "(variable \<times> type) \<Rightarrow> term atom formula" where
+    "type_precond (v, T) =
+      disj_fmlas (map (Atom \<circ> (\<lambda>p. predAtm p [term.VAR v])) (type_conds T))"
+  
+  fun param_precond :: "(variable \<times> type) list \<Rightarrow> term atom formula" where
+    "param_precond params = conj_fmlas (map type_precond params)"
+
+  definition detype_pred :: "predicate_decl \<Rightarrow> predicate_decl" where
+    "detype_pred p = PredDecl (pred p) (replicate (length (argTs p)) \<omega>)"
+
+  definition detype_preds :: "predicate_decl list \<Rightarrow> predicate_decl list" where
+    "detype_preds preds \<equiv> map detype_pred preds"
+
+  fun detype_ent :: "('ent \<times> type) \<Rightarrow> ('ent \<times> type)" where
+  "detype_ent (n, T) = (n, \<omega>)"
+
+  definition detype_ents :: "('ent \<times> type) list \<Rightarrow> ('ent \<times> type) list" where
+    "detype_ents params \<equiv> map detype_ent params"
+
+  fun detype_ac :: "ast_action_schema \<Rightarrow> ast_action_schema" where
+  "detype_ac (Action_Schema nam params pre eff) =
+    Action_Schema nam (detype_ents params) (param_precond params \<^bold>\<and> pre) eff"
+  (* TODO other alternative *)
+  lemma detype_ac_def:
+    "detype_ac ac = Action_Schema
+      (ast_action_schema.name ac)
+      (detype_ents (ast_action_schema.parameters ac))
+      (param_precond (ast_action_schema.parameters ac) \<^bold>\<and> (ast_action_schema.precondition ac))
+      (ast_action_schema.effect ac)"
+    by (metis ast_action_schema.collapse detype_ac.simps)
+
+  definition detype_dom :: "ast_domain" where
+  "detype_dom \<equiv>
+    Domain
+      []
+      (type_preds @ detype_preds (predicates D))
+      (detype_ents (consts D))
+      (map detype_ac (actions D))"
+
+  fun supertype_facts :: "(object \<times> type) list \<Rightarrow> object atom formula list" where
+    "supertype_facts objs = concat (map supertype_facts_for objs)"
+end
+
+definition (in ast_problem) detype_prob :: "ast_problem" where
+"detype_prob \<equiv> Problem
+    detype_dom
+    (detype_ents (objects P))
+    (supertype_facts (objects P) @ supertype_facts (consts D) @ (init P))
+    (goal P)"
+
+context ast_domain
+begin
+
+interpretation d2 : ast_domain detype_dom .
+end
+
+(*
+- type hierarchy is empty (implicitly includes ''object'')
+- predicate argument types are Either [''object'']
+- const types are Either [''object'']
+- actions parameters are detyped *)
+definition (in ast_domain) typeless_dom :: "bool" where
+  "typeless_dom \<equiv>
+    types D = []
+    \<and> (\<forall>p \<in> set (predicates D). \<forall>T \<in> set (argTs p). T = \<omega>)
+    \<and> undefined"
+
+definition (in ast_problem) typeless_prob :: "bool" where
+  "typeless_prob \<equiv> typeless_dom \<and> undefined"
+
+subsection \<open>Complete Normalization\<close>
+
+definition (in ast_problem) normalized_prob :: "bool" where
+  "normalized_prob \<equiv> typeless_prob \<and> undefined"
+
+
+(* ------------------------------------- PROOFS ------------------------------------------------- *)
+
+(* Properties of Ab+La *)
+
+context ast_domain
+begin
+  
+  lemma subtype_edge_swap: "subtype_edge = prod.swap"
+  proof -
+    have "\<And>a b. subtype_edge (a, b) = prod.swap (a, b)"
+      by simp
+    thus ?thesis by fast
+  qed
+  
+  lemma wf_object: "ast_domain.wf_type D \<omega>"
+    unfolding wf_type.simps by simp
+
+  lemma tyterm_prop: "P (ty_term varT cnstT x) \<longleftrightarrow>
+    (case x of term.VAR x' \<Rightarrow> P (varT x') |
+               term.CONST x' \<Rightarrow> P (cnstT x'))"
+    apply (split term.split)
+    by simp
+  
+  lemma tyterm_elem: "(ty_term (map_of varT) (map_of cnstT) x \<noteq> None)
+    \<longleftrightarrow> (case x of term.VAR x' \<Rightarrow> x' \<in> fst ` set varT |
+                   term.CONST x' \<Rightarrow> x' \<in> fst ` set cnstT)"
+    apply (split term.split)
+    using tyterm_prop by (simp add: map_of_eq_None_iff)
+
+  (* signatures *)
+  
+  lemma sig_none: "sig p \<noteq> None \<longleftrightarrow> p \<in> pred ` set (predicates D)"
+  proof -
+    have "sig p = map_of (map (\<lambda>PredDecl p n \<Rightarrow> (p,n)) (predicates D)) p"
+      using sig_def by simp
+    have "sig p \<noteq> None \<longleftrightarrow> p \<in> fst ` set (map (\<lambda>PredDecl p n \<Rightarrow> (p, n)) (predicates D))"
+      by (metis map_of_eq_None_iff sig_def)
+    also have "... \<longleftrightarrow> p \<in> pred ` set (predicates D)"
+      by (simp add: image_iff predicate_decl.case_eq_if)
+    finally show ?thesis .
+  qed
+end
+
+context wf_ast_domain
+begin
+  (* Deliberate shortcut: The goal is explaining that if a predatm in the original problem is well-
+  formed, so is the corresponding predatm in the detyped problem. I use distincness of predicate IDs
+  as an assumption here, to make the map_of logic simpler. But technically this isn't really
+  necessary. TODO explain, maybe *)
+  lemma pred_resolve:
+    shows "map_of (map (\<lambda>PredDecl p n \<Rightarrow> (p, n)) (predicates D)) p = Some Ts
+      \<longleftrightarrow> PredDecl p Ts \<in> set (predicates D)"
+  proof -
+    define preds where ps: "preds \<equiv> predicates D"
+    hence dis: "distinct (map pred preds)" using wf_domain wf_domain_def by simp
+    let ?map = "map (\<lambda>pd. (pred pd, argTs pd)) preds"
+    have zip: "?map = zip (map pred preds) (map argTs preds)"
+      by (induction preds) simp_all
+    hence "map_of ?map p = Some Ts \<longleftrightarrow> (p, Ts) \<in> set ?map" using dis by simp
+    also have "... \<longleftrightarrow> PredDecl p Ts \<in> set preds" by force
+    ultimately show ?thesis
+      by (simp add: predicate_decl.case_eq_if ps)
+  qed
+
+  lemma sig_some:
+    "sig p = Some Ts \<longleftrightarrow> PredDecl p Ts \<in> set (predicates D)"
+    using wf_domain wf_domain_def sig_def pred_resolve by presburger
+
+  lemma sig_E:
+    assumes "sig p = Some Ts"
+    shows "\<exists>!i. i < length (predicates D) \<and> (predicates D ! i = PredDecl p Ts)"
+    oops
+end
+
+context ast_domain begin
+  (* supertype enumeration *)
+  
+  lemma wf_type_iff_listed: "wf_type (Either ts) \<longleftrightarrow> (\<forall>t \<in> set ts. t \<in> set (type_names))"
+  proof -
+    have "set type_names = insert ''object'' (fst ` set (types D))" using type_names_def by auto
+    thus ?thesis by (simp add: subset_code(1))
+  qed
+
+  lemma of_type_iff_reach:
+    shows "of_type oT T \<longleftrightarrow> (
+      \<forall>ot \<in> set (primitives oT).
+      \<exists>t \<in> set (primitives T).
+        t \<in> set (supertypes_of ot))"
+  proof -
+    have "subtype_rel = set (map prod.swap (types D))"
+      using subtype_rel_def subtype_edge_swap by metis
+    hence subrel_inv: "subtype_rel = (set (types D))\<inverse>" by auto
+    hence "of_type oT T \<longleftrightarrow>
+      set (primitives oT) \<subseteq> ((set (types D))\<inverse>)\<^sup>* `` set (primitives T)"
+      using of_type_def by simp
+    also have "... \<longleftrightarrow>
+      set (primitives oT) \<subseteq> ((set (types D))\<^sup>*)\<inverse> `` set (primitives T)"
+      by (simp add: rtrancl_converse)
+    also have "... \<longleftrightarrow>
+      (\<forall>ot \<in> set (primitives oT). ot \<in> ((set (types D))\<^sup>*)\<inverse> `` set (primitives T))"
+      by auto
+    also have "... \<longleftrightarrow>
+      (\<forall>ot \<in> set (primitives oT). \<exists>t. (ot, t) \<in> (set (types D))\<^sup>* \<and> t \<in> set (primitives T))"
+      by auto
+    finally show ?thesis using reachable_iff_in_star by metis
+  qed
+end
+
+
+lemma (in ast_problem) obj_of_type_iff_reach:
+  assumes "objT n = Some oT"
+  shows  "is_obj_of_type n T \<longleftrightarrow>
+    (\<forall>ot \<in> set (primitives oT).
+      \<exists>t \<in> set (primitives T).
+    t \<in> set (supertypes_of ot))"
+  using assms is_obj_of_type_def of_type_iff_reach by auto
+
+lemma (in ast_domain) single_of_type_iff:
+  shows "of_type (Either [ot]) T \<longleftrightarrow> (
+    \<exists>t \<in> set (primitives T).
+      t \<in> set (supertypes_of ot))"
+  using of_type_iff_reach by simp
+
+lemma (in ast_problem) simple_obj_of_type_iff:
+  assumes "objT n = Some (Either [ot])"
+  shows  "is_obj_of_type n T \<longleftrightarrow>
+      (\<exists>t \<in> set (primitives T).
+    t \<in> set (supertypes_of ot))"
+  using assms is_obj_of_type_def single_of_type_iff by auto
+
+subsubsection \<open> Type Normalization Produces Typeless PDDL \<close>
+
+(* TODO *)
+
+subsubsection \<open> Type Normalization Preserves Well-Formedness \<close>
+
+lemma dist_pred: "distinct xs \<Longrightarrow> distinct (map Pred xs)"
+  by (meson distinct_map inj_onI predicate.inject)
+
+context ast_domain
+begin
+
+  lemma t_pred_name: "pred pd = pred (detype_pred pd)"
+    using detype_pred_def by simp
+  
+  lemma t_preds_names: (* TODO simplify *)
+    assumes "distinct (map pred (predicates D))"
+    shows "distinct (map pred (type_preds @ detype_preds (predicates D)))"
+  proof -
+    (* Predicate names are unique because the original predicate names are unchanged
+       and the additional predicate names are unique (based on unique type names)
+       and distinct from the original predicates. *)
+    let ?preds = "map pred (predicates D)"
+    let ?t_preds = "map pred type_preds"
+    let ?dt_preds = "map pred (detype_preds (predicates D))"
+  
+    have p_eq_dt: "?preds = ?dt_preds" using t_pred_name detype_preds_def by simp
+    hence g1: "distinct ( map pred (detype_preds (predicates D)))"
+      using assms by argo
+  
+    let ?prefix = "safe_prefix (map predicate.name ?preds)"
+    (* =  map (pred_for_type D) (type_names D) *)
+    have dist_types: "distinct type_names" using type_names_def by auto
+    have t_ps_expand: "?t_preds = map (Pred \<circ> ((@) ?prefix)) type_names"
+      by (simp add: pred_names_def type_preds_def)
+    (* define, not let, because the terms become too big for the solver *)
+    define pnames where "pnames \<equiv> map predicate.name ?preds"
+    define tp_names where "tp_names \<equiv> map (((@) (safe_prefix pnames))) type_names"
+    
+    have "set (map ((@) (safe_prefix pnames)) type_names) \<inter> set pnames = {}"
+      using safe_prefix_correct by auto
+    hence "set tp_names \<inter> set pnames = {}" using tp_names_def pnames_def by simp
+    hence "set (map Pred tp_names) \<inter> set (map Pred pnames) = {}" by auto
+    hence "set (map (Pred \<circ> ((@) (safe_prefix pnames))) type_names) \<inter> set (map Pred pnames) = {}"
+      using tp_names_def by (metis map_map)
+  
+    moreover have "map Pred pnames = ?preds" using pnames_def by simp
+    moreover have "?t_preds = map (Pred \<circ> ((@) (safe_prefix pnames))) type_names"
+      using t_ps_expand pnames_def by blast
+    ultimately have g2: "set ?t_preds \<inter> set ?dt_preds = {}" by (metis p_eq_dt)
+    
+    have d: "distinct (map ((@) ?prefix) type_names)"
+      using dist_prefix dist_types by simp
+    hence "distinct (map (Pred \<circ> ((@) ?prefix)) type_names)"
+      using dist_pred[OF d] by simp
+    hence g3: "distinct (?t_preds)" using t_ps_expand by metis
+  
+    from g1 g2 g3 show ?thesis by simp
+  qed
+
+  lemma t_preds_names2:
+    assumes "distinct (map pred (predicates D))"
+    shows "distinct (map pred (predicates (detype_dom)))"
+    using assms
+    using t_preds_names ast_domain.sel(2) detype_dom_def by presburger
+
+  lemma t_preds_wf:
+    "\<forall>p \<in> set (type_preds @ (detype_preds (predicates D))).
+      ast_domain.wf_predicate_decl detype_dom p"
+    (is "\<forall>p \<in> ?s. ?wfp2 p")
+  proof -
+    interpret d2 : ast_domain "detype_dom" .
+    let ?D2 = "detype_dom"
+    have c1: "\<forall>p \<in> set type_preds. ?wfp2 p"
+    proof
+      fix p assume "p \<in> set type_preds"
+      hence "\<forall>t \<in> set (argTs p). t = \<omega>" using type_preds_def by auto
+      hence "\<forall>t \<in> set (argTs p). ast_domain.wf_type ?D2 t"
+        using wf_object d2.wf_object by fastforce
+      thus "?wfp2 p"
+        by (metis ast_domain.wf_predicate_decl.simps predicate_decl.exhaust_sel)
+    qed
+    have c2: "\<forall>p \<in> set (detype_preds (predicates D)). ?wfp2 p"
+    proof
+      fix p assume "p \<in> set (detype_preds (predicates D))"
+      hence "\<forall>t \<in> set (argTs p). t = \<omega>" using detype_preds_def detype_pred_def by auto
+      hence "\<forall>t \<in> set (argTs p). ast_domain.wf_type ?D2 t" using wf_object by auto
+      thus "?wfp2 p"
+        by (metis ast_domain.wf_predicate_decl.simps predicate_decl.exhaust_sel)
+    qed
+    (* just to speed things up *)
+    thus ?thesis using c1 c2 by auto
+  qed
+
+end
+
+(* ---------------------- TODO move up ------------------------- *)
+
+
+
+
+
+
+lemma t_ents_names:
+  assumes "distinct (map fst ents)"
+  shows "distinct (map fst (detype_ents ents))"
+proof -
+  have "\<And>xs. map fst xs = map fst (map detype_ent xs)" by auto
+  thus ?thesis using assms by (metis detype_ents_def)
+qed
+
+(* did I mess up simp somehow? why is this getting harder? *)
+lemma t_ents_wf_aux:
+  shows "(\<forall>ent\<in>set (detype_ents ents). ast_domain.wf_type (detype_dom D) (snd ent))"
+proof
+  fix ent assume elem: "ent \<in> set (detype_ents ents)"
+  obtain n T where nT: "(n, T) = ent" by (metis surjective_pairing)
+
+  from elem nT obtain og where "og \<in> set ents" and 2: "ent = detype_ent og"
+    by (metis (mono_tags, lifting) detype_ents_def image_iff list.set_map)
+  from nT 2 have "T = \<omega>" by (metis detype_ent.elims prod.inject)
+  hence "ast_domain.wf_type (detype_dom D) T" using wf_object by simp
+  thus "ast_domain.wf_type (detype_dom D) (snd ent)" using nT by fastforce
+qed
+
+lemma t_ents_wf:
+  shows "(\<forall>(n,T)\<in>set (detype_ents ents). ast_domain.wf_type (detype_dom D) T)"
+  using t_ents_wf_aux by fastforce
+
+(* formulas *)
+
+(* Detyped formulas *)
+
+lemma
+  "map (\<lambda>t. y) xs = replicate (length xs) y"
+  by (simp add: map_replicate_const)
+
+(* pred sig ts \<Longrightarrow> detype pred sig (detype ts)*)
+lemma
+  assumes "distinct (map pred (predicates D))"
+  assumes "ast_domain.sig D p = Some Ts"
+  shows "ast_domain.sig (detype_dom D) p
+    = Some (replicate (length Ts) \<omega>)"
+proof -
+  from assms have "PredDecl p Ts \<in> set (predicates D)" using sig_some by blast
+  have "predicates (detype_dom D) =
+    map (\<lambda>pd. PredDecl (pred pd) (replicate (length (argTs pd)) \<omega>)) (predicates D)"
+  from assms have "distinct (map pred (predicates (detype_dom D)))"
+    using t_preds_names2 by simp
+
+
+
+
+(* ty_term (map_of params) constT *)
+
+(* fun wf_pred_atom_c :: "ast_domain \<Rightarrow> ('ent \<rightharpoonup> type) \<Rightarrow> predicate \<times> 'ent list \<Rightarrow> bool" where
+  "wf_pred_atom_c D ty_ent (p,vs) \<longleftrightarrow> (
+    case (sig_c D) p of
+      None \<Rightarrow> False
+    | Some Ts \<Rightarrow> list_all2 (is_of_type_c D ty_ent) vs Ts)" *)
+
+(* I feel like I need to figure out how to make my formulas smaller *)
+lemma
+  assumes "ast_domain.wf_pred_atom D (ty_term (map_of params) (ast_domain.constT D )) (p,vs)"
+  defines "D2 \<equiv> (detype_dom D)"
+  shows "ast_domain.wf_pred_atom D2 (ty_term (map_of (detype_ents params)) (ast_domain.constT D2)) (p,vs)"
+proof -
+  let ?tyt = "ty_term (map_of params) (ast_domain.constT D )"
+  let ?tyt2 = "ty_term (map_of (detype_ents params)) (ast_domain.constT D2)"
+  
+  from assms obtain Ts where "ast_domain.sig D p = Some Ts \<and> list_all2 (ast_domain.is_of_type D ?tyt) vs Ts"
+    by (metis not_None_eq option.simps(4-5) ast_domain.wf_pred_atom.simps)
+  hence "length vs = length Ts" using list_all2_lengthD by auto
+
+
+
+  oops
+
+(* actions *)
+
+
+
+lemma t_acs_names:
+  assumes "distinct (map ast_action_schema.name (actions D))"
+  shows "distinct (map ast_action_schema.name (map (detype_ac D) (actions D)))"
+proof -
+  have "\<And>ac. ast_action_schema.name ac = ast_action_schema.name (detype_ac D ac)"
+    by (metis ast_action_schema.collapse ast_action_schema.sel(1) detype_ac.simps)
+  (* I'd like composition syntax but the automatic solver doesn't like me today *)
+  hence "map ast_action_schema.name (actions D) = map ast_action_schema.name (map (detype_ac D) (actions D))"
+    by simp
+  thus ?thesis using assms by argo
+qed
+
+(* wf type not checked! *)
+(* fun wf_action_schema :: "ast_action_schema \<Rightarrow> bool" where
+    "wf_action_schema (Action_Schema n params pre eff) \<longleftrightarrow> (
+      let
+        tyt = ty_term (map_of params) constT
+      in
+        distinct (map fst params)
+      \<and> wf_fmla tyt pre
+      \<and> wf_effect tyt eff)" *)
+
+lemma "\<forall>x \<in> set xs. P x \<Longrightarrow> \<forall>x. P x \<longrightarrow> Q (f x) \<Longrightarrow> \<forall>x \<in> set (map f xs). Q x"
+  by simp
+
+lemma wf_ac_expanded: "ast_domain.wf_action_schema D a \<longleftrightarrow> (
+      let
+        tyt = ty_term (map_of (parameters a)) (ast_domain.constT D)
+      in
+        distinct (map fst (parameters a))
+      \<and> ast_domain.wf_fmla D tyt (ast_action_schema.precondition a)
+      \<and> ast_domain.wf_effect D tyt (ast_action_schema.effect a))"
+  using ast_domain.wf_action_schema.simps
+  by (metis ast_action_schema.collapse)
+
+lemma t_acs_wf_aux:
+  assumes "ast_domain.wf_action_schema D a"
+  shows "ast_domain.wf_action_schema (detype_dom D) (detype_ac D a)"
+proof -
+  let ?D2 = "detype_dom D"
+  let ?a2 = "detype_ac D a"
+  define tyt where tyt: "tyt \<equiv> ty_term (map_of (parameters a)) (ast_domain.constT D)"
+  from assms have 1: "distinct (map fst (parameters a))" using wf_ac_expanded by metis
+  from assms tyt have 2: "ast_domain.wf_fmla D tyt (ast_action_schema.precondition a)" using wf_ac_expanded by metis
+  from assms tyt have 3: "ast_domain.wf_effect D tyt (ast_action_schema.effect a)" using wf_ac_expanded by metis
+
+  define tyt2 where tyt2: "tyt2 \<equiv> ty_term (map_of (parameters ?a2)) (ast_domain.constT ?D2)"
+  have ps: "parameters ?a2 = detype_ents (parameters a)"
+    by (metis ast_action_schema.collapse ast_action_schema.sel(2) detype_ac.simps)
+  hence c1: "distinct (map fst (parameters ?a2))" using 1 t_ents_names by auto
+  from ps have cx: "(\<forall>(n,T)\<in>set (parameters ?a2). ast_domain.wf_type (detype_dom D) T)"
+    using t_ents_wf by metis (* not required for wf_action_schema but should be, maybe *)
+
+  have c2a: "ast_domain.wf_fmla ?D2 tyt2 (param_precond D (parameters a))" sorry
+  have c2b: "ast_domain.wf_fmla ?D2 tyt2 (ast_action_schema.precondition a)" sorry
+  from c2a c2b have c2: "ast_domain.wf_fmla ?D2 tyt2 (ast_action_schema.precondition ?a2)"
+    by (metis ast_action_schema.collapse ast_action_schema.sel(3) ast_domain.wf_fmla.simps(3) detype_ac.simps)
+  have "ast_domain.wf_effect ?D2 tyt2 (ast_action_schema.effect a)" sorry
+  hence c3: "ast_domain.wf_effect ?D2 tyt2 (ast_action_schema.effect ?a2)"
+    by (metis ast_action_schema.collapse ast_action_schema.sel(4) detype_ac.simps)
+
+  from c1 c2 c3 tyt2 show ?thesis using wf_ac_expanded by auto
+qed
+
+lemma t_acs_wf:
+  assumes "\<forall>a\<in>set (actions D). ast_domain.wf_action_schema D a"
+  shows "(\<forall>a\<in>set (map (detype_ac D) (actions D)). ast_domain.wf_action_schema (detype_dom D) a)"
+  oops
+  
+
+theorem detype_dom_wf:
+  assumes "ast_domain.wf_domain D"
+  shows "ast_domain.wf_domain (detype_dom D)"
+proof -
+  let ?D2 = "detype_dom D"
+  from assms have
+    typs: "ast_domain.wf_types D" and
+    pred_names: "distinct (map pred (predicates D))" and
+    wf_preds: "\<forall>p\<in>set (predicates D). ast_domain.wf_predicate_decl D p" and
+    cnst_names: "distinct (map fst (consts D))" and
+    wf_cnsts: "\<forall>(n,T)\<in>set (consts D). ast_domain.wf_type D T" and
+    ac_names: "distinct (map ast_action_schema.name (actions D))" and
+    wf_acs: "\<forall>a\<in>set (actions D). ast_domain.wf_action_schema D a"
+    by (simp_all add: ast_domain.wf_domain_def)
+
+  (* Types are well-formed because they are simply empty. *)
+  have c1: "ast_domain.wf_types ?D2" using ast_domain.wf_types_def by simp
+  note c2 = t_preds_names[OF pred_names]
+  note c3 = t_preds_wf
+  have c4: "distinct (map fst (detype_ents(consts D)))"
+    using cnst_names by (simp add: t_ents_names)
+  have c5: "(\<forall>(n,T)\<in>set (detype_ents (consts D)). ast_domain.wf_type ?D2 T)"
+    using wf_cnsts t_ents_wf by metis
+  have c6: "distinct (map ast_action_schema.name (map (detype_ac D) (actions D)))"
+    using ac_names t_acs_names by simp
+  have c7: "(\<forall>a\<in>set (map (detype_ac D) (actions D)). ast_domain.wf_action_schema ?D2 a)" sorry
+
+  from c1 c2 c3 c4 c5 c6 c7 show ?thesis
+    using ast_domain.wf_domain_def by auto
+qed
+
+lemma "distinct nams \<Longrightarrow> distinct (map Pred nams)"
+  by (meson distinct_map inj_onI predicate.inject)
+
+
+lemma "set as \<inter> set bs = {} \<Longrightarrow> distinct as \<Longrightarrow> distinct bs \<Longrightarrow> distinct (as @ bs)"
+  by simp
+
+(* TODO update locale hierarchy accordingly*)
+lemma "ast_problem.wf_problem P \<Longrightarrow> ast_problem.wf_problem (detype_prob P)"
+  oops
+
+lemma "ast_domain.wf_domain D \<Longrightarrow> typeless_dom (detype_dom D)"
+  oops
+
+lemma "ast_problem.wf_problem P \<Longrightarrow> typeless_prob (detype_prob P)"
+  oops
+
+(* type normalization correct w.r.t. execution*)
+
+lemma "ast_problem.valid_plan P \<pi> \<Longrightarrow> ast_problem.valid_plan (detype_prob P) \<pi>"
+  oops
+
+
+end

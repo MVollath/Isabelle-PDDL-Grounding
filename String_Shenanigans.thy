@@ -23,5 +23,8 @@ lemma distinctize_correct:
   "disjnt (set blocked) (set (distinctize blocked new))"
   by (metis (no_types, opaque_lifting) disjnt_iff distinctize_def ex_map_conv safe_prefix_correct)
 
+lemma dist_prefix: "distinct xs \<Longrightarrow> distinct (map ((@) (safe_prefix ys)) xs)"
+  by (simp add: distinct_conv_nth)
+
 
 end
