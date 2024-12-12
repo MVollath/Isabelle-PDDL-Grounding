@@ -1,5 +1,5 @@
 theory Running_Example
-  imports PDDL_Normalization AbLa_Code Testing_Hacks
+  imports PDDL_Normalization_old AbLa_Code Testing_Hacks
 begin
 
 subsection \<open> Problem Description \<close>
@@ -175,11 +175,9 @@ value "type_precond my_domain (Var ''into'', Either [''Car'', ''Train''])"
 value "detype_ac my_domain op_load"
 value "detype_preds my_preds"
 value "detype_dom my_domain"
-lemma "wf_domain_c (detype_dom my_domain)"
-  by eval
+value "assert wf_domain_c (detype_dom my_domain)"
 value "detype_prob my_problem"
-lemma "wf_problem_c (detype_prob my_problem)"
-  by eval
+value "assert wf_problem_c (detype_prob my_problem)"
 
 definition "my_dom_detyped \<equiv> detype_dom my_domain"
 definition "my_prob_detyped \<equiv> detype_prob my_problem"
@@ -190,9 +188,8 @@ value "execute_plan_action_c my_prob_detyped
   (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D''])
   (set (init my_prob_detyped))"
 value "execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped))"
-lemma "execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> my_goal"
-  by eval
-lemma "valid_plan_c my_prob_detyped my_plan"
-  by eval
+value "assert execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> my_goal"
+value "assert valid_plan_c my_prob_detyped my_plan"
+
 
 end

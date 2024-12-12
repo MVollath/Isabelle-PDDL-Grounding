@@ -24,11 +24,16 @@
 	- [ ] Type normalization:
 		- [x] Algorithm
 		- [ ] Proof
+			- [ ] result is typeless
 			- [ ] well-formedness
+				- [x] preds wf
+				- [x] consts wf
+				- [ ] formulas wf
+				- [ ] actions wf
 			- [ ] OG init subset of detyped init, goal unchanged
 			- [ ] static predicates
 			- [ ] type predicates are static
-			- [ ] OG plan action well-formed $\Longleftrightarrow$ detyped plan action well-formed and type preconds satisfied
+			- [ ] OG plan action well-formed$\Longleftrightarrow$ detyped plan action well-formed and type preconds satisfied
 			- [ ] OG plan action enabled and well-formed $\Longleftrightarrow$ detyped plan-action enabled and well-formed
 			- [ ] OG plan action from s to s' $\Longleftrightarrow$ detyped plan action from (s + type preds) to (s' + type preds)
 			- [ ] OG plan action solves $\Longleftrightarrow$ detyped plan action solves

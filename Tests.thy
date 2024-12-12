@@ -2,8 +2,8 @@ theory Tests
   imports Main
     (* "../LTS-formalization/Datalog/Datalog"
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    "Verified_SAT_Based_AI_Planning.STRIPS_Representation" *)
-    "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"
+    "Verified_SAT_Based_AI_Planning.STRIPS_Representation" 
+    "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker" *)
 begin
 
 value "ast_domain.wf_domain'"
@@ -104,6 +104,16 @@ lemma "y = (THE x. P x) \<Longrightarrow> \<exists>!x. P x" oops
 definition foo :: "nat \<Rightarrow> [nat, nat] \<Rightarrow> nat" where
   "foo a b c = a + b - c"
 
+locale my_loc_copy = my_loc
+
+context my_loc
+begin
+lemma "cool = x  - 1"
+  by (simp add: cool_def)
+
+(* sublocale xd : my_loc cool .  --not terminating *)
+
+end
 
 
 end

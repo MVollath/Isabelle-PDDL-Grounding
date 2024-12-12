@@ -8,11 +8,18 @@
 - `no_notation my_fun (infixl "+" 65)`?
 - Why does the automatic solver hate my wf-lemmas?
 - how to unfold a function from "myfun (data x y) = x ..." to "myfun z = data.left x"?
+- in unstructured proof, how to replace all occurrences of something with new variable? (this generalizes the proof, but sometimes you can do it)
+- inner locale for detyped-dom? Look at `t_preds_wf`. Instead of `ast_domain.wf_type ?D2` I want `d2.ast_domain`.
+- `fun "detype_pred (PredDecl p argts) = PredDecl p (transform argts)"` into `lemma "detype_pred p = PredDecl (pred p) (transform (argTs p))"`. Like what I did with `detype_ac_def`
+- why code not executable in Running_Example?
 
 **Ab+La**
 - Where is the PDDL parser?
 - "flat type hierarchy"?
-
+- How to execute code in PDDL_STRIPS_Checker? I always get:
+`"List.coset" is not a constructor, on left hand side of equation, in theorem:
+insert ?x (List.coset ?xs) ≡ List.coset (removeAll ?x ?xs)
+`
 **Orga**
 - Scope: What's the minimum to pass? And what would give me my desired grade?
 - Can this project become part of the AFP? What would I need to watch out for? Can something be in AFP with external dependencies (Datalog formalization is not in AFP)?
