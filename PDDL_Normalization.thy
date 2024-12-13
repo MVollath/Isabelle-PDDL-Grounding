@@ -46,7 +46,7 @@ begin
                   \<and> only_conj (goal P)"
 end
 
-locale restr_prob = wf_ast_problem +
+locale restr_problem = wf_ast_problem +
   assumes restrP: restrict_prob
 begin
   sublocale restr_domain "domain P"
@@ -108,8 +108,8 @@ begin
   definition detype_preds :: "predicate_decl list \<Rightarrow> predicate_decl list" where
     "detype_preds preds \<equiv> map detype_pred preds"
 
-  fun detype_ent :: "('ent \<times> type) \<Rightarrow> ('ent \<times> type)" where
-    "detype_ent (n, T) = (n, \<omega>)"
+  abbreviation detype_ent :: "('ent \<times> type) \<Rightarrow> ('ent \<times> type)" where
+    "detype_ent ent \<equiv> (fst ent, \<omega>)"
 
   definition detype_ents :: "('ent \<times> type) list \<Rightarrow> ('ent \<times> type) list" where
     "detype_ents params \<equiv> map detype_ent params"
@@ -147,17 +147,28 @@ definition (in ast_problem) detype_prob :: "ast_problem" where
 
 (*
 - type hierarchy is empty (implicitly includes ''object'')
-- predicate argument types are Either [''object'']
+- predicate argument types are Either [''object''].
+  - If the input problem is well-formed, this is superfluous and follows from types = []
 - const types are Either [''object'']
-- actions parameters are detyped *)
+  - also sort of superfluous. If well-formed, they can only be [''object'', ''object'', ...]
+    which is semantically equivalent to [''object'']
+- actions parameters are detyped
+  - only not superfluous because wf_action_schema does not ensure well-formed param types. *)
 definition (in ast_domain) typeless_dom :: "bool" where
   "typeless_dom \<equiv>
     types D = []
     \<and> (\<forall>p \<in> set (predicates D). \<forall>T \<in> set (argTs p). T = \<omega>)
-    \<and> undefined"
+    \<and> (\<forall>(n, T) \<in> set (consts D). T = \<omega>)
+    \<and> (\<forall>ac \<in> set (actions D). \<forall>(n, T) \<in> set (parameters ac). T = \<omega>)"
 
+(*
+- domain is detyped
+- objects are detyped
+*)
 definition (in ast_problem) typeless_prob :: "bool" where
-  "typeless_prob \<equiv> typeless_dom \<and> undefined"
+  "typeless_prob \<equiv>
+    typeless_dom
+    \<and> (\<forall>(n, T) \<in> set (objects P). T = \<omega>)"
 
 subsection \<open>Complete Normalization\<close>
 
@@ -166,6 +177,54 @@ definition (in ast_problem) normalized_prob :: "bool" where
 
 
 (* ------------------------------------- PROOFS ------------------------------------------------- *)
+
+(* This is mostly to simplify the syntax, actually. So I can just do
+   \<open>Dt.some_function\<close> instead of \<open>ast_domain.some_function detype_dom\<close> *)
+locale ast_domain2 = ast_domain
+sublocale ast_domain2 \<subseteq> Dt: ast_domain detype_dom .
+locale wf_ast_domain2 = wf_ast_domain
+sublocale wf_ast_domain2 \<subseteq> Dt: ast_domain detype_dom .
+
+locale ast_problem2 = ast_problem
+sublocale ast_problem2 \<subseteq> Pt: ast_problem detype_prob .
+
+subsection \<open>Type Normalization Proofs\<close>
+
+subsubsection \<open> Type Normalization Produces Typeless PDDL \<close>
+
+lemma (in ast_domain) preds_detyped: "\<forall>p \<in> set (predicates detype_dom). \<forall>T \<in> set (argTs p). T = \<omega>"
+  using type_preds_def detype_preds_def detype_dom_def by auto
+
+lemma (in ast_domain) ents_detyped: "\<forall>(n, T) \<in> set (detype_ents ents). T = \<omega>"
+  unfolding detype_ents_def
+  by (simp add: case_prod_beta' detype_dom_def)
+
+lemma (in ast_domain) ac_params_detyped:
+  "\<forall>ac \<in> set (actions detype_dom). \<forall>(n, T) \<in> set (parameters ac). T = \<omega>"
+  using detype_dom_def detype_ac_def ents_detyped by fastforce
+
+lemma (in restr_domain) dom_detyped:
+  "ast_domain.typeless_dom detype_dom"
+proof -
+  have c1: "types detype_dom = []" using detype_dom_def by simp
+  note c2 = preds_detyped
+  have c3: "\<forall>(n, T) \<in> set (consts detype_dom). T = \<omega>"
+    by (simp add: detype_dom_def ents_detyped)
+  note c4 = ac_params_detyped
+
+  from c1 c2 c3 c4 show ?thesis
+    using ast_domain.typeless_dom_def by simp
+qed
+
+lemma (in restr_problem) prob_detyped:
+  "ast_problem.typeless_prob detype_prob"
+proof -
+  have "\<forall>(n, T) \<in> set (objects detype_prob). T = \<omega>"
+    by (simp add: detype_prob_def ents_detyped)
+  thus ?thesis using dom_detyped ast_problem.typeless_prob_def detype_prob_def by simp
+qed
+
+subsubsection \<open> Type Normalization Preserves Well-Formedness \<close>
 
 (* Properties of Ab+La *)
 
@@ -295,11 +354,7 @@ lemma (in ast_problem) simple_obj_of_type_iff:
     t \<in> set (supertypes_of ot))"
   using assms is_obj_of_type_def single_of_type_iff by auto
 
-subsubsection \<open> Type Normalization Produces Typeless PDDL \<close>
-
-(* TODO *)
-
-subsubsection \<open> Type Normalization Preserves Well-Formedness \<close>
+(* well-formedness *)
 
 lemma dist_pred: "distinct names \<Longrightarrow> distinct (map Pred names)"
   by (meson distinct_map inj_onI predicate.inject)
@@ -355,32 +410,20 @@ begin
     thus ?thesis using ast_domain.sel(2) detype_dom_def by presburger
   qed
 
-  lemma (in ast_domain) t_preds_wf:
-    "\<forall>p \<in> set (type_preds @ (detype_preds (predicates D))).
-      ast_domain.wf_predicate_decl detype_dom p"
-    (is "\<forall>p \<in> ?s. ?wfp2 p")
+  lemma (in ast_domain2) t_preds_wf2:
+    "\<forall>p \<in> set (predicates detype_dom). Dt.wf_predicate_decl p"
   proof -
-    interpret d2 : ast_domain "detype_dom" . (* how to just do this everywhere in the context? *)
-    have c1: "\<forall>p \<in> set type_preds. d2.wf_predicate_decl p"
-    proof
-      fix p assume "p \<in> set type_preds"
-      hence "\<forall>t \<in> set (argTs p). t = \<omega>" using type_preds_def by auto
-      hence "\<forall>t \<in> set (argTs p). d2.wf_type t"
-        using wf_object d2.wf_object by fastforce
-      thus "?wfp2 p"
-        by (metis d2.wf_predicate_decl.simps predicate_decl.exhaust_sel)
-    qed
-    have c2: "\<forall>p \<in> set (detype_preds (predicates D)). ?wfp2 p"
-    proof
-      fix p assume "p \<in> set (detype_preds (predicates D))"
-      hence "\<forall>t \<in> set (argTs p). t = \<omega>" using detype_preds_def by auto
-      hence "\<forall>t \<in> set (argTs p). d2.wf_type t" using wf_object by auto
-      thus "?wfp2 p"
-        by (metis d2.wf_predicate_decl.simps predicate_decl.exhaust_sel)
-    qed
-    (* just to speed things up *)
-    thus ?thesis using c1 c2 by auto
+    have "\<forall>p \<in> set (predicates detype_dom). \<forall>T \<in> set (argTs p). T = \<omega>"
+      by (rule preds_detyped)
+    hence "\<forall>p \<in> set (predicates detype_dom). \<forall>T \<in> set (argTs p). Dt.wf_type T"
+      using preds_detyped wf_object by auto
+    thus ?thesis by (metis Dt.wf_predicate_decl.simps predicate_decl.collapse)
   qed
+
+
+lemma (in ast_domain) t_preds_wf:
+    "\<forall>p \<in> set (predicates detype_dom). ast_domain.wf_predicate_decl detype_dom p"
+  using ast_domain2.t_preds_wf2 .
 
   lemma (in ast_domain) t_ents_names:
     assumes "distinct (map fst ents)"
@@ -390,30 +433,37 @@ begin
     thus ?thesis using assms by (metis detype_ents_def)
   qed
 
-  (* did I mess up simp somehow? why is this getting harder? *)
-  lemma (in ast_domain) t_ents_wf_aux:
-    shows "(\<forall>ent\<in>set (detype_ents ents). ast_domain.wf_type detype_dom (snd ent))"
-  proof
-    interpret d2 : ast_domain detype_dom .
-    fix ent assume elem: "ent \<in> set (detype_ents ents)"
-    obtain n T where nT: "(n, T) = ent" by (metis surjective_pairing)
-
-    from elem nT obtain og where "og \<in> set ents" and 2: "ent = detype_ent og"
-      by (metis (mono_tags, lifting) detype_ents_def image_iff list.set_map)
-    from nT 2 have "T = \<omega>" by (metis detype_ent.elims prod.inject)
-    hence "d2.wf_type T" using wf_object by simp
-    thus "d2.wf_type (snd ent)" using nT by fastforce
-  qed
-
   lemma (in ast_domain) t_ents_wf:
     shows "(\<forall>(n,T)\<in>set (detype_ents ents). ast_domain.wf_type detype_dom T)"
-    using t_ents_wf_aux by fastforce
+    using ents_detyped wf_object by fast
 
 (* formulas *)
 
 (* Detyped formulas *)
+  lemma "ast_domain.constT d x = None \<longleftrightarrow> (x \<notin> fst ` set (consts d))"
+    using ast_domain.constT_def by (simp add: map_of_eq_None_iff)
+  lemma "ast_domain.constT detype_dom x = Some \<omega> \<longleftrightarrow> (x \<in> fst ` set (consts detype_dom))"
+    oops
 
-  lemma
+  lemma "argTs (detype_pred p) = replicate (length (argTs p)) \<omega>" by simp
+  lemma "map_of (uno @ dos) = map_of dos ++ map_of uno" by simp
+  lemma "distinct (map fst uno) \<Longrightarrow> distinct (map fst dos) \<Longrightarrow>
+    map_of dos ++ map_of uno = map_of uno ++ map_of dos" sorry
+  lemma "funo = zip (map fst uno) (map (f \<circ> snd) uno)
+    \<Longrightarrow> map_of uno x = Some y \<Longrightarrow> map_of funo x = Some (f y)" sorry
+  (* Prove via: obtain minimal i s.t. x = fst (uno ! i),
+     then y = snd (uno ! i), and f y = snd (funo ! i)
+     then, since i is minimal, map_of funo x = snd (funo ! i) *)
+  lemma "map_of m x \<noteq> None \<longleftrightarrow> (\<exists>p \<in> set m. fst p = x)"
+    by (metis fst_conv image_eqI in_fst_imageE map_of_eq_None_iff)
+  value "map_of [(1::nat, 1::nat), (1::nat, 2::nat)] 1"
+  lemma "map_of m x = Some y \<longleftrightarrow> (i < length m \<and> fst (m ! i) = x \<and>
+        snd (m ! i) = y \<and> \<not>(\<exists>j. j < i \<and> fst (m ! j) = x))" oops
+
+  (* map_of (map (\<lambda>PredDecl p n \<Rightarrow> (p,n)) (predicates D)) *)
+
+  (* using distinctness of predicates is a shortcut here*)
+  lemma t_preds_arity:
     assumes "sig p = Some Ts"
     shows "ast_domain.sig detype_dom p
       = Some (replicate (length Ts) \<omega>)"
@@ -425,7 +475,8 @@ begin
       using detype_dom_def detype_preds_def by simp
     from assms have "distinct (map pred (predicates detype_dom))"
       using t_preds_names by simp
-    oops
+    thus ?thesis sorry
+  qed
 
   (* I feel like I need to figure out how to make my formulas smaller *)
   lemma (in ast_domain)
@@ -544,17 +595,13 @@ begin
     from c1 c2 c3 c4 c5 c6 c7 show ?thesis
       using d2.wf_domain_def detype_dom_def by simp
   qed
-
 end
-
-lemma "set as \<inter> set bs = {} \<Longrightarrow> distinct as \<Longrightarrow> distinct bs \<Longrightarrow> distinct (as @ bs)"
-  by simp
 
 (* ---------------------- Milestones ------------------------- *)
 
 
 (* TODO update locale hierarchy accordingly *)
-lemma "ast_problem.wf_problem P \<Longrightarrow> ast_problem.wf_problem (detype_prob P)"
+lemma (in ast_problem) "ast_problem.wf_problem detype_prob"
   oops
 
 lemma "ast_domain.wf_domain D \<Longrightarrow> typeless_dom (detype_dom D)"
@@ -565,7 +612,7 @@ lemma "ast_problem.wf_problem P \<Longrightarrow> typeless_prob (detype_prob P)"
 
 (* type normalization correct w.r.t. execution*)
 
-lemma "ast_problem.valid_plan P \<pi> \<Longrightarrow> ast_problem.valid_plan (detype_prob P) \<pi>"
+lemma (in restr_problem) "valid_plan \<pi> \<Longrightarrow> ast_problem.valid_plan detype_prob \<pi>"
   oops
 
 

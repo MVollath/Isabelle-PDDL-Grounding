@@ -1,5 +1,5 @@
 theory Running_Example
-  imports PDDL_Normalization_old AbLa_Code Testing_Hacks
+  imports PDDL_Normalization AbLa_Code Testing_Hacks
 begin
 
 subsection \<open> Problem Description \<close>
@@ -76,6 +76,7 @@ definition "op_unload \<equiv> Action_Schema ''unload''
 definition "my_actions \<equiv> [op_drive, op_choochoo, op_load, op_unload]"
 
 definition "my_domain \<equiv> Domain my_types my_preds my_consts my_actions"
+value "my_domain"
 (*value "ast_domain.wf_domain my_domain"*)
 
 
@@ -178,6 +179,10 @@ value "detype_dom my_domain"
 value "assert wf_domain_c (detype_dom my_domain)"
 value "detype_prob my_problem"
 value "assert wf_problem_c (detype_prob my_problem)"
+
+global_interpretation D : ast_domain my_domain .
+value "D.bar"
+value "D.detype_ac op_drive"
 
 definition "my_dom_detyped \<equiv> detype_dom my_domain"
 definition "my_prob_detyped \<equiv> detype_prob my_problem"

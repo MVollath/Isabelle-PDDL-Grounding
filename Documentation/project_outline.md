@@ -13,7 +13,7 @@
 	- non-numerical, non-temporal fragment. TODO: is it most similar to *PDDL 2.1, level 1*?
 	- doesn't support: axioms, $\exists,\forall$-quantified formulas, effects with nested conditions and $\forall$-quantification
 	- does add: either types, multiple inheritance, cyclic type-dependencies
-- [ ] subset of PDDL used as input to grounder
+- [x] subset of PDDL used as input to grounder
 	- MVP: no disjunctions in goal formula
 	- MVP?: objects/consts must have primitive types. I likely won't lift this restriction.
 	- MVP: in Ab+La, action signature types aren't checked for  well-formedness. This complicates preconditions for type normalization.
@@ -24,12 +24,9 @@
 	- [ ] Type normalization:
 		- [x] Algorithm
 		- [ ] Proof
-			- [ ] result is typeless
-			- [ ] well-formedness
-				- [x] preds wf
-				- [x] consts wf
-				- [ ] formulas wf
-				- [ ] actions wf
+			- [x] result is typeless
+			- [x] well-formedness of everything but formulas
+			- [x] well-formedness of formulas
 			- [ ] OG init subset of detyped init, goal unchanged
 			- [ ] static predicates
 			- [ ] type predicates are static

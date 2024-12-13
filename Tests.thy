@@ -6,7 +6,6 @@ theory Tests
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker" *)
 begin
 
-value "ast_domain.wf_domain'"
 
 text \<open>This is just a collection of random stuff. Read at your own risk.\<close>
 
@@ -114,6 +113,10 @@ lemma "cool = x  - 1"
 (* sublocale xd : my_loc cool .  --not terminating *)
 
 end
+definition (in my_loc) "fooo \<equiv> Cons x [4, 5]"
+
+interpretation f : my_loc 7 .
+value "f.fooo"
 
 
 end
