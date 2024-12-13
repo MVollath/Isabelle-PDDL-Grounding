@@ -1,3 +1,4 @@
+Some of the markdown formatting doesn't work on github. It does on [stackedit.io](stackedit.io/app)
 # Project Outline
 ## Formats
 - Helmert PDDL format
@@ -25,8 +26,12 @@
 		- [x] Algorithm
 		- [ ] Proof
 			- [x] result is typeless
-			- [x] well-formedness of everything but formulas
-			- [x] well-formedness of formulas
+			- [x] well-formedness
+				- [x] preds wf of everything but formulas
+				- [x] consts wf
+				- [x] atoms wf
+				- [ ] formulas wf
+				- [ ] actions wf
 			- [ ] OG init subset of detyped init, goal unchanged
 			- [ ] static predicates
 			- [ ] type predicates are static

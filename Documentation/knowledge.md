@@ -1,28 +1,26 @@
-
+Some of the markdown formatting doesn't work on github. It does on [stackedit.io](stackedit.io/app)
 # Questions
 **Isabelle**
-- How to export Isabelle Code and link with python code?
-- Is there a function `"('a × 'a) list ⇒ ('a × 'a) list"` that turns a relation into its (reflexive) transitive closure? I wrote one but it's not fully optimized.
-- What does `declare my_lemma [code]` do? Why would a lemma be turned into SML?
-- What does `context fixes ty_ent` do if context has no name?
-- `no_notation my_fun (infixl "+" 65)`?
-- Why does the automatic solver hate my wf-lemmas?
-- how to unfold a function from "myfun (data x y) = x ..." to "myfun z = data.left x"?
 - in unstructured proof, how to replace all occurrences of something with new variable? (this generalizes the proof, but sometimes you can do it)
-- inner locale for detyped-dom? Look at `t_preds_wf`. Instead of `ast_domain.wf_type ?D2` I want `d2.ast_domain`.
-- `fun "detype_pred (PredDecl p argts) = PredDecl p (transform argts)"` into `lemma "detype_pred p = PredDecl (pred p) (transform (argTs p))"`. Like what I did with `detype_ac_def`
-- why code not executable in Running_Example?
+- `fun "detype_pred (PredDecl p argts) = PredDecl p (transform argts)"` into `lemma "detype_pred p = PredDecl (pred p) (transform (argTs p))"`. Like what I did with `detype_ac_def`. It's a sort of unfolding.
+- Is there a function `"('a × 'a) list ⇒ ('a × 'a) list"` that turns a relation into its (reflexive) transitive closure? I wrote one but it's not fully optimized.
 
 **Ab+La**
 - Where is the PDDL parser?
 - "flat type hierarchy"?
 - How to execute code in PDDL_STRIPS_Checker? I always get:
 `"List.coset" is not a constructor, on left hand side of equation, in theorem:
-insert ?x (List.coset ?xs) ≡ List.coset (removeAll ?x ?xs)
-`
+insert ?x (List.coset ?xs) ≡ List.coset (removeAll ?x ?xs)`
+
 **Orga**
 - Scope: What's the minimum to pass? And what would give me my desired grade?
 - Can this project become part of the AFP? What would I need to watch out for? Can something be in AFP with external dependencies (Datalog formalization is not in AFP)?
+
+**minor**
+- How to export Isabelle Code and link with python code?
+- What does `declare my_lemma [code]` do? Why would a lemma be turned into SML?
+- `no_notation my_fun (infixl "+" 65)`?
+
 # Dependencies (tentative):
 - [NetworkX](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.approximation.treewidth.treewidth_min_degree.html) (python library):
 	- Function `treewidth_min_degree` used for tree decomposition

@@ -119,4 +119,8 @@ interpretation f : my_loc 7 .
 value "f.fooo"
 
 
+definition "dub (x :: nat) \<equiv> x + x"
+value "map_option dub (Some x)"
+
+
 end

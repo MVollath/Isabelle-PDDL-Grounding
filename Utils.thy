@@ -24,5 +24,9 @@ fun conj_fmlas :: "'a formula list \<Rightarrow> 'a formula" where
   "conj_fmlas [f] = f" |
   "conj_fmlas (f # fs) = f \<^bold>\<and> conj_fmlas fs"
 
+(* lemmas *)
+
+
+
 
 end
