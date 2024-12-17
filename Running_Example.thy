@@ -1,5 +1,5 @@
 theory Running_Example
-  imports PDDL_Normalization AbLa_Code Testing_Hacks
+  imports PDDL_Normalization_code AbLa_Code Testing_Hacks
 begin
 
 subsection \<open> Problem Description \<close>
@@ -70,7 +70,10 @@ definition "op_unload \<equiv> Action_Schema ''unload''
   (Effect
     [Atom (predAtm (Pred ''at'') [term.VAR (Var ''what''), term.VAR (Var ''where'')])]
     [Atom (predAtm (Pred ''in'') [term.VAR (Var ''what''), term.VAR (Var ''from'')])])"
-
+definition "op_broken \<equiv> Action_Schema ''broken''
+  [(Var ''x'', Either [''n'existe pas''])]
+  \<bottom>
+  (Effect [] [])" (* considered well-formed as long as x is not used in any formulas *)
 
 
 definition "my_actions \<equiv> [op_drive, op_choochoo, op_load, op_unload]"
@@ -113,10 +116,8 @@ definition "my_goal \<equiv>
 
 definition "my_problem \<equiv> Problem my_domain my_objs my_init my_goal"
 
-value "assert wf_domain_c my_domain"
 lemma "wf_domain_c my_domain" by eval
-
-value "assert wf_problem_c my_problem"
+lemma "wf_problem_c my_problem" by eval
 
 subsection \<open> Execution \<close>
 
@@ -150,8 +151,8 @@ value "execute_plan_action_c my_problem
   (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D''])
   (set my_init)"
 value "execute_plan_c my_problem my_plan (set my_init)"
-value "assert execute_plan_c my_problem my_plan (set my_init) \<^sup>c\<TTurnstile>\<^sub>\<equiv> my_goal"
-value "assert valid_plan_c my_problem my_plan"
+lemma "execute_plan_c my_problem my_plan (set my_init) \<^sup>c\<TTurnstile>\<^sub>\<equiv> my_goal" by eval
+lemma "valid_plan_c my_problem my_plan" by eval
 
 definition
   "showvals f xs \<equiv> map (\<lambda>x. (x, f x)) xs"
@@ -176,13 +177,9 @@ value "type_precond my_domain (Var ''into'', Either [''Car'', ''Train''])"
 value "detype_ac my_domain op_load"
 value "detype_preds my_preds"
 value "detype_dom my_domain"
-value "assert wf_domain_c (detype_dom my_domain)"
+lemma "wf_domain_c (detype_dom my_domain)" by eval
 value "detype_prob my_problem"
-value "assert wf_problem_c (detype_prob my_problem)"
-
-global_interpretation D : ast_domain my_domain .
-value "D.bar"
-value "D.detype_ac op_drive"
+lemma "wf_problem_c (detype_prob my_problem)" by eval
 
 definition "my_dom_detyped \<equiv> detype_dom my_domain"
 definition "my_prob_detyped \<equiv> detype_prob my_problem"
@@ -193,8 +190,8 @@ value "execute_plan_action_c my_prob_detyped
   (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D''])
   (set (init my_prob_detyped))"
 value "execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped))"
-value "assert execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> my_goal"
-value "assert valid_plan_c my_prob_detyped my_plan"
+lemma "execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> my_goal" by eval
+lemma "valid_plan_c my_prob_detyped my_plan" by eval
 
 
 end
