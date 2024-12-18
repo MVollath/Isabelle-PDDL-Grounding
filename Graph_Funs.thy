@@ -21,6 +21,7 @@ fun reach_aux :: "('a \<times> 'a) list \<Rightarrow> ('a \<Rightarrow> ('a list
       (upd_all R r_ls l_rs)
       (upd_all L l_rs r_ls))"
 
+(* only used in proofs *)
 fun reach_aux_aux :: "('a \<times> 'a) list \<Rightarrow> ('a \<times> 'a) list \<Rightarrow> ('a \<Rightarrow> ('a list)) \<Rightarrow> ('a \<Rightarrow> ('a list)) \<Rightarrow> ('a \<Rightarrow> ('a list))" where
   "reach_aux_aux [] done R L = L" |
   "reach_aux_aux ((l, r) # todo) done R L = 
@@ -184,6 +185,9 @@ proof -
   also have "... \<longleftrightarrow> y \<in> set all \<and> (\<forall>x \<in> set xs. y \<in> set ((reachable_nodes rel) x))" by auto
   finally show ?thesis using reachable_iff_in_star by metis
 qed
+
+lemma reachable_dis: "distinct (reachable_nodes rel x)" sorry
+
 
 
 end
