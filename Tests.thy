@@ -2,125 +2,40 @@ theory Tests
   imports Main
     (* "../LTS-formalization/Datalog/Datalog"
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    "Verified_SAT_Based_AI_Planning.STRIPS_Representation" 
-    "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker" *)
+    "Verified_SAT_Based_AI_Planning.STRIPS_Representation" *)
+    "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"
 begin
 
+lemma conj3: assumes "A \<and> B \<and> C" shows "A" "B" "C" using assms by simp_all
 
-text \<open>This is just a collection of random stuff. Read at your own risk.\<close>
+lemma conj2: assumes "A \<and> B" shows "A" "B" using assms by simp_all
 
-subsection \<open> locale/context tutorial \<close>
-locale my_loc =
-  fixes x :: int
-begin
+lemma a: "(0::nat) < 3 \<and> (0::nat) < 6 \<and> (0::nat) < 9" sorry
 
-definition "evsa \<equiv> even x"
+thm conj3[OF a]
 
-end
-
-interpretation ahsh: my_loc 6 .
-
-value "ahsh.evsa"
+(* how hacky is this? *)
+abbreviation uplus ("_ \<uplus> _ = _" 50) where
+  "a \<uplus> b = x \<equiv> disjnt a b \<and> a \<union> b = x"
 
 
-context my_loc
-begin
 
-definition "cool \<equiv> x - 1"
-
-context
-  fixes scale :: int
-begin
-definition "sc_x \<equiv> scale * x"
-
-end
-
-end
-
-value "ahsh.cool"
-value "ahsh.sc_x 6"
-
-locale my_loc2 = my_loc +
-  assumes ev: evsa
-begin
-
-definition "hot \<equiv> x + 1"
-end
-
-interpretation lava : my_loc2 4
-  by (simp add: my_loc.evsa_def my_loc2_def)
+axiomatization f :: "('a \<times> 'a) list \<Rightarrow> ('a \<times> 'a) list" where
+  f_prop: "set (f rel) = (set rel)\<^sup>+"
 
 
-print_locale! my_loc2
-thm my_loc2_def
+datatype slorp = Slorp (ann : nat) (ben : nat)
 
-definition (in my_loc2) "sixer \<equiv> x+6"
-lemma (in my_loc2) sixer_even: "even sixer"
-  using ev evsa_def sixer_def by auto
+fun gomp where "gomp (Slorp x y) = x + y"
 
-thm "lava.sixer_even"
-thm "my_loc2.sixer_even"
+thm slorp.collapse
 
-value "lava.sixer"
+lemma slorp_coll2: "\<lbrakk>\<And>x y. P (Slorp x y) x y\<rbrakk> \<Longrightarrow> P s (ann s) (ben s)"
+  by (metis slorp.collapse)
 
-locale my_loc3 = my_loc2 "fst pair" for
-  pair :: "int \<times> int" +
-  assumes pair_eq: "fst pair = snd pair"
+lemma gomp2: "\<And>x y. gomp (Slorp x y) = x + y" by simp
 
-locale my_loc_dos =
-  un: my_loc2 a + dos: my_loc2 b
-  for a and b +
-  assumes pair_eq: "a = b"
-begin
-
-lemma "(a + b) mod 4 = 0"
-proof -
-  have "even a"
-    using un.ev un.evsa_def by auto
-  oops
-
-lemma "un.evsa" by (simp add: un.ev)
-
-end
-
-(* sublocale, but I'm too lazy for an example rn *)
-
-(* unique existence *)
-
-definition "g \<equiv> THE x. x = (5::nat) + 1"
-thm ex1_eq
-lemma "\<exists>! h. (5::nat) + 1 = h" sorry
-
-lemma "\<exists>h. P h \<Longrightarrow> \<forall>a b. P a \<and> P b \<longrightarrow> a = b \<Longrightarrow> \<exists>!h. P h"
-  by blast
-
-definition "d \<equiv> THE x. x > (5::nat)"
-
-lemma "y = (THE x. P x) \<Longrightarrow> \<exists>!x. P x" oops
-
-(* random *)
-
-definition foo :: "nat \<Rightarrow> [nat, nat] \<Rightarrow> nat" where
-  "foo a b c = a + b - c"
-
-locale my_loc_copy = my_loc
-
-context my_loc
-begin
-lemma "cool = x  - 1"
-  by (simp add: cool_def)
-
-(* sublocale xd : my_loc cool .  --not terminating *)
-
-end
-definition (in my_loc) "fooo \<equiv> Cons x [4, 5]"
-
-interpretation f : my_loc 7 .
-value "f.fooo"
-
-
-definition "dub (x :: nat) \<equiv> x + x"
-value "map_option dub (Some x)"
+thm slorp_coll2[where P = "\<lambda>s x y. gomp s = x + y", OF gomp2]
 
 
 end

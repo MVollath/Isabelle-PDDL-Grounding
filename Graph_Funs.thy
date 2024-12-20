@@ -95,6 +95,9 @@ lemma upd_all_cons:
 abbreviation describes_rel :: "('a \<times> 'a) set \<Rightarrow> ('a \<Rightarrow> 'a list) \<Rightarrow> bool" where
   "describes_rel rel bags \<equiv> \<forall>x y. y \<in> set (bags x) \<longleftrightarrow> (x, y) \<in> rel"
 
+lemma desc_rel_alt: "describes_rel rel f \<Longrightarrow> set (f x) = {y. (x, y) \<in> rel}"
+  by auto
+
 (* TODO use this *)
 lemma "foldr f xs i = fold f (rev xs) i"
   by (metis foldr_conv_fold)
@@ -166,6 +169,18 @@ theorem reachable_iff_in_star: "describes_rel ((set rel)\<^sup>*) (reachable_nod
   using reach_aux_aux_usage reach_aux_aux
   by metis
 
+lemma reachable_set: "set (reachable_nodes rel x) \<subseteq> insert x (snd ` set rel)"
+proof -
+  have "y \<in> insert x (snd ` set rel)" if "y \<in> set (reachable_nodes rel x)" for y
+  proof (cases "y = x")
+    case False
+    then show ?thesis using rtranclE Range.intros snd_eq_Range that
+      by (metis insertCI reachable_iff_in_star)
+  qed simp
+  thus ?thesis by auto
+qed
+
+(* artifact from when I misunderstood Either types *)
 lemma reachable_iff_any_in_star:
   "y \<in> set (reachable_nodes_froms rel xs) \<longleftrightarrow>
     (\<exists>x \<in> set xs. (x, y) \<in> (set rel)\<^sup>*)"
@@ -176,6 +191,7 @@ proof -
   finally show ?thesis using reachable_iff_in_star by metis
 qed
 
+(* artifact from when I misunderstood Either types *)
 lemma reachable_iff_all_in_star:
   "y \<in> set (common_reachable_nodes rel all xs) \<longleftrightarrow>
     y \<in> set all \<and> (\<forall>x \<in> set xs. (x, y) \<in> (set rel)\<^sup>*)"

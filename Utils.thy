@@ -26,6 +26,7 @@ fun conj_fmlas :: "'a formula list \<Rightarrow> 'a formula" where
 
 (* lemmas *)
 
+(*
 lemma map_of_SomeIn: "map_of m x = Some y \<Longrightarrow> y \<in> snd ` set m"
   by (metis image_eqI map_of_SomeD snd_conv)
 
@@ -33,6 +34,43 @@ lemma map_of_in_R_iff: "x \<in> fst ` set m \<longleftrightarrow> (\<exists>y. m
   using map_of_SomeIn
   by (metis map_of_eq_None_iff not_None_eq)
 
+lemma map_of_single_val:
+  assumes "\<forall>y \<in> snd ` set m. y = z"
+  shows "x \<in> fst ` set m \<longleftrightarrow> map_of m x = Some z"
+  using assms
+  by (metis domI domIff map_of_eq_None_iff map_of_in_R_iff)
+*)
 
+lemma map_of_in_R_iff: "x \<in> fst ` set m \<longleftrightarrow> (\<exists>y. map_of m x = Some y)"
+  by (metis map_of_eq_None_iff not_None_eq)
+
+lemma map_of_single_val:
+  assumes "\<forall>(x, y) \<in> set m. y = z"
+  shows "x \<in> fst ` set m \<longleftrightarrow> map_of m x = Some z"
+  using assms map_of_in_R_iff
+  by (metis (full_types) case_prodD map_of_SomeD)
+
+lemma map_inj_dis:
+  assumes "distinct xs" "inj f"
+  shows "distinct (map f xs)"
+  using assms distinct_map subset_inj_on by blast
+
+
+(* rule rewriting *)
+
+lemma conj_split_4:
+  assumes "A \<and> B \<and> C \<and> D"
+  shows "A" "B" "C" "D"
+  using assms by simp_all
+
+lemma conj_split_5:
+  assumes "A \<and> B \<and> C \<and> D \<and> E"
+  shows "A" "B" "C" "D" "E"
+  using assms by simp_all
+
+lemma conj_split_7:
+  assumes "A \<and> B \<and> C \<and> D \<and> E \<and> F \<and> G"
+  shows "A" "B" "C" "D" "E" "F" "G"
+  using assms by simp_all
 
 end

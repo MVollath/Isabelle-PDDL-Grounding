@@ -5,16 +5,12 @@ Some of the markdown formatting doesn't work on github. It does on [stackedit.io
 - `fun "detype_pred (PredDecl p argts) = PredDecl p (transform argts)"` into `lemma "detype_pred p = PredDecl (pred p) (transform (argTs p))"`. Like what I did with `detype_ac_def`. It's a sort of unfolding.
 - Is there a function `"('a × 'a) list ⇒ ('a × 'a) list"` that turns a relation into its (reflexive) transitive closure? I wrote one but it's not fully optimized.
 
-**Ab+La**
 - Where is the PDDL parser?
+**Ab+La**
 - "flat type hierarchy"?
 - How to execute code in PDDL_STRIPS_Checker? I always get:
 `"List.coset" is not a constructor, on left hand side of equation, in theorem:
 insert ?x (List.coset ?xs) ≡ List.coset (removeAll ?x ?xs)`
-
-**Orga**
-- Scope: What's the minimum to pass? And what would give me my desired grade?
-- Can this project become part of the AFP? What would I need to watch out for? Can something be in AFP with external dependencies (Datalog formalization is not in AFP)?
 
 **minor**
 - How to export Isabelle Code and link with python code?
@@ -277,3 +273,43 @@ There's also the concept of variable-uniqueness where variable repetition like $
 
 **Why relaxed reachability**
 If you allow negative atoms, previously derived atoms could become false in the future.  You would need reassignments, which would greatly complicate the iterative Datalog solver.
+
+### Type Normalization Semantics
+Semantics of the original problem and the detyped problem are equivalent.
+That is, executing plan action pi in an original state s yields state s' iff executing the same plan action in the detyped equivalent of s yields the equivalent of s'. In detail:
+
+The only difference between an 'original' state s and a state s' in the derived problem is that
+	s' = s \uplus s_T,
+where s_T is the substate that holds the objects' type intormation.
+s_T is static. s_T \subseteq init P2, and for any plan action \pi, s_T \subseteq s ==> s_T \subseteq (exec_T s \pi).
+This is easily shown from the fact that s_T consists only of type predicates, which no action effect can contain.
+(action effects in P2 are unchanged. Since they are well-formed in the original problem, where type predicates don't exist, they cannot contain them.)
+If follows:
+
+exec s \pi = s' <--> exec_T (s_T \un s) \pi = s_t \un s'
+
+note that essentially, exec = exec_T. I should prove this equivalence starting with just execute_ground_action...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
