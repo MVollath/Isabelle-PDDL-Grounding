@@ -26,21 +26,6 @@ fun conj_fmlas :: "'a formula list \<Rightarrow> 'a formula" where
 
 (* lemmas *)
 
-(*
-lemma map_of_SomeIn: "map_of m x = Some y \<Longrightarrow> y \<in> snd ` set m"
-  by (metis image_eqI map_of_SomeD snd_conv)
-
-lemma map_of_in_R_iff: "x \<in> fst ` set m \<longleftrightarrow> (\<exists>y. map_of m x = Some y \<and> y \<in> snd ` set m)"
-  using map_of_SomeIn
-  by (metis map_of_eq_None_iff not_None_eq)
-
-lemma map_of_single_val:
-  assumes "\<forall>y \<in> snd ` set m. y = z"
-  shows "x \<in> fst ` set m \<longleftrightarrow> map_of m x = Some z"
-  using assms
-  by (metis domI domIff map_of_eq_None_iff map_of_in_R_iff)
-*)
-
 lemma map_of_in_R_iff: "x \<in> fst ` set m \<longleftrightarrow> (\<exists>y. map_of m x = Some y)"
   by (metis map_of_eq_None_iff not_None_eq)
 

@@ -10,7 +10,7 @@ lemma conj3: assumes "A \<and> B \<and> C" shows "A" "B" "C" using assms by simp
 
 lemma conj2: assumes "A \<and> B" shows "A" "B" using assms by simp_all
 
-lemma a: "(0::nat) < 3 \<and> (0::nat) < 6 \<and> (0::nat) < 9" sorry
+lemma a: "(0::nat) < 3 \<and> (0::nat) < 6 \<and> (0::nat) < 9" by simp
 
 thm conj3[OF a]
 

@@ -169,15 +169,29 @@ theorem reachable_iff_in_star: "describes_rel ((set rel)\<^sup>*) (reachable_nod
   using reach_aux_aux_usage reach_aux_aux
   by metis
 
+lemma a: "y \<in> set (reachable_nodes rel x) \<longleftrightarrow> (x, y) \<in> (set rel)\<^sup>*"
+  by (simp add: reachable_iff_in_star)
+
+
+lemma b: "(x, y) \<in> rel\<^sup>* \<longleftrightarrow> x = y \<or> (x, y) \<in> rel\<^sup>+"
+  by (metis rtrancl_eq_or_trancl)
+
+thm rtrancl_eq_or_trancl
+
+lemma "y \<in> set (reachable_nodes rel x) \<longleftrightarrow> x = y \<or> x \<noteq> y \<and> (x, y) \<in> (set rel)\<^sup>+"
+  using reachable_iff_in_star rtrancl_eq_or_trancl by metis
+
+lemma "(x, y) \<in> (set rel)\<^sup>+ \<Longrightarrow> y \<in> snd ` set rel"
+  by (metis image_iff snd_conv trancl.cases)
+
+lemma "(x, y) \<in> (set rel)\<^sup>* \<Longrightarrow> x = y \<or>  y \<in> snd ` set rel"
+  by (metis Range.intros rtrancl.cases snd_eq_Range)
+
 lemma reachable_set: "set (reachable_nodes rel x) \<subseteq> insert x (snd ` set rel)"
 proof -
-  have "y \<in> insert x (snd ` set rel)" if "y \<in> set (reachable_nodes rel x)" for y
-  proof (cases "y = x")
-    case False
-    then show ?thesis using rtranclE Range.intros snd_eq_Range that
-      by (metis insertCI reachable_iff_in_star)
-  qed simp
-  thus ?thesis by auto
+  have "(x, y) \<in> (set rel)\<^sup>* \<Longrightarrow> x = y \<or> y \<in> snd ` set rel" for y
+    by (metis Range.intros rtrancl.cases snd_eq_Range)
+  thus ?thesis using reachable_iff_in_star by fast
 qed
 
 (* artifact from when I misunderstood Either types *)
@@ -202,6 +216,7 @@ proof -
   finally show ?thesis using reachable_iff_in_star by metis
 qed
 
+(* if I fail to prove this, I can always use remdups as a crutch *)
 lemma reachable_dis: "distinct (reachable_nodes rel x)" sorry
 
 

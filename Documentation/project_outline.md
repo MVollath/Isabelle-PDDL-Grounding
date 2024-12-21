@@ -30,8 +30,8 @@ Some of the markdown formatting doesn't work on github. It does on [stackedit.io
 				- [x] preds wf of everything but formulas
 				- [x] consts wf
 				- [x] atoms wf
-				- [ ] formulas wf
-				- [ ] actions wf
+				- [x] formulas wf
+				- [x] actions wf
 			- [ ] OG init subset of detyped init, goal unchanged
 			- [ ] static predicates
 			- [ ] type predicates are static
@@ -39,6 +39,7 @@ Some of the markdown formatting doesn't work on github. It does on [stackedit.io
 			- [ ] OG plan action enabled and well-formed $\Longleftrightarrow$ detyped plan-action enabled and well-formed
 			- [ ] OG plan action from s to s' $\Longleftrightarrow$ detyped plan action from (s + type preds) to (s' + type preds)
 			- [ ] OG plan action solves $\Longleftrightarrow$ detyped plan action solves
+		- [ ] Code equivalence / global_interpretation
 	- [ ] Precond normalization:
 		- [ ] Definition of NNF
 		- [ ] Algorithm
@@ -73,6 +74,7 @@ Some of the markdown formatting doesn't work on github. It does on [stackedit.io
 
 ### Improvements to MVP
 
+- [ ] remove `remdups` crutches
 - [ ] rule decomposition with tree decomposition
 	- [ ] generate rule graph + proof
 	- [ ] tree decomposition = rule decomposition logic

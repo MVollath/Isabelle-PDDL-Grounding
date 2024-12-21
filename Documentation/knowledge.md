@@ -1,12 +1,11 @@
+
 Some of the markdown formatting doesn't work on github. It does on [stackedit.io](stackedit.io/app)
 # Questions
 **Isabelle**
 - in unstructured proof, how to replace all occurrences of something with new variable? (this generalizes the proof, but sometimes you can do it)
-- `fun "detype_pred (PredDecl p argts) = PredDecl p (transform argts)"` into `lemma "detype_pred p = PredDecl (pred p) (transform (argTs p))"`. Like what I did with `detype_ac_def`. It's a sort of unfolding.
-- Is there a function `"('a × 'a) list ⇒ ('a × 'a) list"` that turns a relation into its (reflexive) transitive closure? I wrote one but it's not fully optimized.
 
-- Where is the PDDL parser?
 **Ab+La**
+- Where is the PDDL parser?
 - "flat type hierarchy"?
 - How to execute code in PDDL_STRIPS_Checker? I always get:
 `"List.coset" is not a constructor, on left hand side of equation, in theorem:
@@ -14,8 +13,6 @@ insert ?x (List.coset ?xs) ≡ List.coset (removeAll ?x ?xs)`
 
 **minor**
 - How to export Isabelle Code and link with python code?
-- What does `declare my_lemma [code]` do? Why would a lemma be turned into SML?
-- `no_notation my_fun (infixl "+" 65)`?
 
 # Dependencies (tentative):
 - [NetworkX](https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.approximation.treewidth.treewidth_min_degree.html) (python library):
@@ -289,27 +286,3 @@ If follows:
 exec s \pi = s' <--> exec_T (s_T \un s) \pi = s_t \un s'
 
 note that essentially, exec = exec_T. I should prove this equivalence starting with just execute_ground_action...
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
