@@ -2,9 +2,12 @@ theory Tests
   imports Main
     (* "../LTS-formalization/Datalog/Datalog"
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    "Verified_SAT_Based_AI_Planning.STRIPS_Representation" *)
-    "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"
+    "Verified_SAT_Based_AI_Planning.STRIPS_Representation"
+    "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker" *)
+    "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
 begin
+
+(* ------------------------------------------------------------------------------------ *)
 
 lemma conj3: assumes "A \<and> B \<and> C" shows "A" "B" "C" using assms by simp_all
 
@@ -36,6 +39,11 @@ lemma slorp_coll2: "\<lbrakk>\<And>x y. P (Slorp x y) x y\<rbrakk> \<Longrightar
 lemma gomp2: "\<And>x y. gomp (Slorp x y) = x + y" by simp
 
 thm slorp_coll2[where P = "\<lambda>s x y. gomp s = x + y", OF gomp2]
+
+datatype 'a foom = Aned 'a 'a | Batt "'a list"
+
+value "map_foom (\<lambda>x :: nat. True)"
+
 
 
 end
