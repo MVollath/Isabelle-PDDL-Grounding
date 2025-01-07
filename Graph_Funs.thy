@@ -3,6 +3,8 @@ imports Main
 begin
 
 (* alternatively, use remdups on each bag at the end *)
+text \<open> the use of conc_unique here is only for performance issues and I probably should
+not have bothered with it.\<close>
 fun conc_unique :: "'a list \<Rightarrow> 'a list \<Rightarrow> 'a list" where
   "conc_unique [] rs = rs" |
   "conc_unique (l # ls) rs = conc_unique ls (if l \<in> set rs then rs else l # rs)"
@@ -11,7 +13,8 @@ definition upd_bag :: "'a list \<Rightarrow> 'a \<Rightarrow> ('a \<Rightarrow> 
   "upd_bag values key rel \<equiv> rel(key := conc_unique values (rel key))"
 
 definition upd_all where
-  "upd_all rel keys values \<equiv> fold (upd_bag values) keys rel"
+  "upd_all rel keys values \<equiv> foldr (upd_bag values) keys rel"
+(*foldr is easier to prove by induction *)
 
 fun reach_aux :: "('a \<times> 'a) list \<Rightarrow> ('a \<Rightarrow> ('a list)) \<Rightarrow> ('a \<Rightarrow> ('a list)) \<Rightarrow> ('a \<Rightarrow> ('a list))" where
   "reach_aux [] R L = L" |
@@ -34,9 +37,9 @@ text \<open> TODO: use mapping instead of lambda! \<close>
 abbreviation reachable_nodes :: "('a \<times> 'a) list \<Rightarrow> 'a \<Rightarrow> 'a list" where
   "reachable_nodes rel \<equiv> reach_aux rel (\<lambda>x. [x]) (\<lambda>x. [x])"
 
-(* the other functions were programmed before I understood the big problems with allowing constants
+(* the following (unused) functions were programmed before I understood the big problems with allowing constants
   to have "Either" types *)
-
+(*
 fun group_bags :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
   "group_bags f [] = []" |
   "group_bags f (x # xs) = conc_unique (f x) (group_bags f xs)"
@@ -54,7 +57,7 @@ fun intersect_bags :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'b list \<Righta
 
 abbreviation common_reachable_nodes :: "('a \<times> 'a) list \<Rightarrow> 'a list \<Rightarrow> 'a list \<Rightarrow> 'a list" where
   "common_reachable_nodes rel all xs \<equiv>
-    intersect_bags (reachable_nodes rel) all xs"
+    intersect_bags (reachable_nodes rel) all xs"*)
 
 (* ---------------- PROOFS ------------------- *)
 
@@ -63,7 +66,7 @@ lemma conc_unique_un:
   apply (induction xs arbitrary: ys)
   by auto
 
-lemma group_bags_un:
+(*lemma group_bags_un:
   "set (group_bags f xs) = \<Union>{set (f x) | x. x \<in> set xs}"
 proof (induction xs)
   case (Cons a as)
@@ -76,8 +79,6 @@ qed simp
 lemma list_int_int:
   "set (list_int xs ys) = set xs \<inter> set ys" by auto
 
-lemma "\<Inter> ss = {s' | s'. \<forall>s \<in> ss. s' \<in> s}" by auto
-
 lemma int_bags_int:
   "set (intersect_bags f all xs) = set all \<inter> \<Inter>{set (f x) | x. x \<in> set xs}"
 proof (induction xs)
@@ -86,40 +87,101 @@ proof (induction xs)
     set (f a) \<inter> (set all \<inter> \<Inter>{set (f x) | x. x \<in> set as})"
     using Cons list_int_int intersect_bags.simps(2) by metis
   thus ?case by auto
-qed simp
+qed simp *)
 
-lemma upd_all_cons:
-  "upd_all rel (a#as) values = upd_all (rel(a := conc_unique values (rel a))) as values"
-  by (simp add: upd_all_def[unfolded upd_bag_def])
 
-abbreviation describes_rel :: "('a \<times> 'a) set \<Rightarrow> ('a \<Rightarrow> 'a list) \<Rightarrow> bool" where
+definition describes_rel :: "('a \<times> 'a) set \<Rightarrow> ('a \<Rightarrow> 'a list) \<Rightarrow> bool" where
   "describes_rel rel bags \<equiv> \<forall>x y. y \<in> set (bags x) \<longleftrightarrow> (x, y) \<in> rel"
+declare describes_rel_def[simp]
 
-lemma desc_rel_alt: "describes_rel rel f \<Longrightarrow> set (f x) = {y. (x, y) \<in> rel}"
+lemma desc_rel_alt: "describes_rel rel bags \<longleftrightarrow> (\<forall>x. set (bags x) = {y. (x, y) \<in> rel})"
   by auto
+
+lemma "describes_rel r f \<Longrightarrow> describes_rel (insert (a, b) r) (f(a:=b # f a))"
+  by simp
+
+value "Pair False True"
+
+lemma "{(a, b) | b. b \<in> bs} = (Pair a) ` bs" by auto
+
+lemma upd_bag_aux:
+  assumes "set u = vs \<union> set (f x)"
+    "describes_rel r f"
+  shows "describes_rel (r \<union> (Pair x) ` vs) (f(x:=u))"
+  using assms by auto
+
+lemma upd_bag_correct:
+  "describes_rel r f \<Longrightarrow> describes_rel (r \<union> (Pair x) ` set vals) (upd_bag vals x f)"
+  using conc_unique_un upd_bag_aux upd_bag_def by metis
+
+
+definition upd_all2 where
+  "upd_all2 r keys vals = fold (upd_bag vals) keys r"
+
+lemma "upd_all r (k#ks) vs = upd_bag vs k (upd_all r ks vs)"
+  unfolding upd_all_def by simp
+
+lemma "upd_all2 r (k#ks) vs = upd_all2 (upd_bag vs k r) ks vs"
+  unfolding upd_all2_def by simp
+
+lemma "Pair x ` vs = {(x, v)|v. v \<in> vs}" by auto
+
+lemma upd_all_correct:
+  assumes "describes_rel r f"
+  shows "describes_rel (r \<union> {(k, v). k \<in> set ks \<and> v \<in> set vs}) (upd_all f ks vs)"
+  using assms
+proof (induction ks)
+  case Nil
+  thus ?case unfolding upd_all_def by simp
+next
+  case Cons
+  note Cons.IH[OF Cons.prems]
+  note upd_bag_correct[OF this]
+  thus ?case unfolding upd_all_def by auto
+qed
 
 (* TODO use this *)
 lemma "foldr f xs i = fold f (rev xs) i"
   by (metis foldr_conv_fold)
 
+thm rtrancl_insert
+
+lemma rtrancl_insert_elem: "(a, b) \<in> (insert (c, d) rel)\<^sup>* \<longleftrightarrow>
+        (a, b) \<in> rel\<^sup>* \<or> ((a, c) \<in> rel\<^sup>* \<and> (d, b) \<in> rel\<^sup>*)"
+  using rtrancl_insert (* by fast: 4 seconds *)
+proof -
+  have "(a, b) \<in> (insert (c, d) rel)\<^sup>* \<longleftrightarrow>
+    (a, b) \<in> rel\<^sup>* \<union> {(x, y). (x, c) \<in> rel\<^sup>* \<and> (d, y) \<in> rel\<^sup>*}"
+    using rtrancl_insert by metis
+  thus ?thesis by simp
+qed
+
 lemma upd_all_L:
   assumes "describes_rel (rel\<^sup>*) L"
           "describes_rel ((rel\<^sup>*)\<inverse>) R"
-  shows "describes_rel (({(l, r)} \<union> rel)\<^sup>*) (upd_all L (R l) (L r))"
-  sorry
+  shows "describes_rel ((insert (l, r) rel)\<^sup>*) (upd_all L (R l) (L r))"
+proof -
+  let ?B = "upd_all L (R l) (L r)"
+  have "describes_rel (rel\<^sup>* \<union> {(k, v). k \<in> set (R l) \<and> v \<in> set (L r)}) ?B"
+    using upd_all_correct[OF assms(1)] .
+  hence "describes_rel (rel\<^sup>* \<union> {(k, v). (l, k) \<in> (rel\<^sup>*)\<inverse> \<and> (r, v) \<in> rel\<^sup>*}) ?B"
+    using assms by simp
+  hence "describes_rel (rel\<^sup>* \<union> {(k, v). (k, l) \<in> rel\<^sup>* \<and> (r, v) \<in> rel\<^sup>*}) ?B" by simp
+  thus ?thesis using assms rtrancl_insert by metis
+qed
 
 lemma upd_all_R:
   assumes "describes_rel (rel\<^sup>*) L"
           "describes_rel ((rel\<^sup>*)\<inverse>) R"
-        shows "describes_rel ((({(l, r)} \<union> rel)\<^sup>*)\<inverse>) (upd_all R (L r) (R l))"
+        shows "describes_rel (((insert (l, r) rel)\<^sup>*)\<inverse>) (upd_all R (L r) (R l))"
 proof -
   from assms(2) have 1: "describes_rel ((rel\<inverse>)\<^sup>*) R" by (simp add: rtrancl_converse)
   from assms(1) have 2: "describes_rel (((rel\<inverse>)\<^sup>*)\<inverse>) L" by (simp add: rtrancl_converse)
-  have 3: "describes_rel (({(r, l)} \<union> rel\<inverse>)\<^sup>*) (upd_all R (L r) (R l))"
+  have 3: "describes_rel ((insert (r, l) (rel\<inverse>))\<^sup>*) (upd_all R (L r) (R l))"
     by (rule upd_all_L[OF 1 2])
-  have "({(l, r)} \<union> rel)\<inverse> = {(r, l)} \<union> rel\<inverse>" by auto
-  moreover have   "(({(l, r)} \<union> rel)\<^sup>*)\<inverse> = (({(l, r)} \<union> rel)\<inverse>)\<^sup>*" by (simp add: rtrancl_converse)
-  ultimately have "(({(l, r)} \<union> rel)\<^sup>*)\<inverse> = ({(r, l)} \<union> rel\<inverse>)\<^sup>*" by simp
+  have "(insert (l, r) rel)\<inverse> = insert (r, l) (rel\<inverse>)" by auto
+  moreover have   "((insert (l, r) rel)\<^sup>*)\<inverse> = ((insert (l, r) rel)\<inverse>)\<^sup>*" by (simp add: rtrancl_converse)
+  ultimately have "((insert (l, r) rel)\<^sup>*)\<inverse> = (insert (r, l) (rel\<inverse>))\<^sup>*" by simp
   from 3 this show ?thesis by simp
 qed
 
@@ -163,41 +225,29 @@ proof -
   ultimately show ?thesis by simp
 qed
 
+declare describes_rel_def[simp del]
 
-
-theorem reachable_iff_in_star: "describes_rel ((set rel)\<^sup>*) (reachable_nodes rel)"
-  using reach_aux_aux_usage reach_aux_aux
+(* \<longleftrightarrow> "describes_rel ((set rel)\<^sup>* ) (reachable_nodes rel)" *)
+theorem reachable_iff_in_star: "y \<in> set (reachable_nodes rel x) \<longleftrightarrow> (x, y) \<in> (set rel)\<^sup>*"
+  using reach_aux_aux_usage reach_aux_aux describes_rel_def
   by metis
-
-lemma a: "y \<in> set (reachable_nodes rel x) \<longleftrightarrow> (x, y) \<in> (set rel)\<^sup>*"
-  by (simp add: reachable_iff_in_star)
-
-
-lemma b: "(x, y) \<in> rel\<^sup>* \<longleftrightarrow> x = y \<or> (x, y) \<in> rel\<^sup>+"
-  by (metis rtrancl_eq_or_trancl)
-
-thm rtrancl_eq_or_trancl
-
-lemma "y \<in> set (reachable_nodes rel x) \<longleftrightarrow> x = y \<or> x \<noteq> y \<and> (x, y) \<in> (set rel)\<^sup>+"
-  using reachable_iff_in_star rtrancl_eq_or_trancl by metis
-
-lemma "(x, y) \<in> (set rel)\<^sup>+ \<Longrightarrow> y \<in> snd ` set rel"
-  by (metis image_iff snd_conv trancl.cases)
-
-lemma "(x, y) \<in> (set rel)\<^sup>* \<Longrightarrow> x = y \<or>  y \<in> snd ` set rel"
-  by (metis Range.intros rtrancl.cases snd_eq_Range)
 
 lemma reachable_set: "set (reachable_nodes rel x) \<subseteq> insert x (snd ` set rel)"
 proof -
-  have "(x, y) \<in> (set rel)\<^sup>* \<Longrightarrow> x = y \<or> y \<in> snd ` set rel" for y
-    by (metis Range.intros rtrancl.cases snd_eq_Range)
-  thus ?thesis using reachable_iff_in_star by fast
+  have "set (reachable_nodes rel x) = {y. (x, y) \<in> (set rel)\<^sup>*}"
+    using reachable_iff_in_star by fast
+  also have "... = (set rel)\<^sup>* `` {x}" by auto
+  also have "... = insert x ((set rel)\<^sup>+ `` {x})" using rtrancl_trancl_reflcl by blast
+  also have "... \<subseteq> insert x (snd ` (set rel)\<^sup>+)" by force
+  also have "... = insert x (snd ` set rel)" by (metis trancl_range snd_eq_Range)
+  finally show ?thesis .
 qed
 
 (* artifact from when I misunderstood Either types *)
+(*
 lemma reachable_iff_any_in_star:
   "y \<in> set (reachable_nodes_froms rel xs) \<longleftrightarrow>
-    (\<exists>x \<in> set xs. (x, y) \<in> (set rel)\<^sup>*)"
+    (\<exists>x \<in> set xs. (x, y) \<in> (set rel)\<^sup>* )"
 proof -
   have "y \<in> set (reachable_nodes_froms rel xs) \<longleftrightarrow>
     y \<in> \<Union>{set ((reachable_nodes rel) x) | x. x \<in> set xs}" using group_bags_un by metis
@@ -208,13 +258,13 @@ qed
 (* artifact from when I misunderstood Either types *)
 lemma reachable_iff_all_in_star:
   "y \<in> set (common_reachable_nodes rel all xs) \<longleftrightarrow>
-    y \<in> set all \<and> (\<forall>x \<in> set xs. (x, y) \<in> (set rel)\<^sup>*)"
+    y \<in> set all \<and> (\<forall>x \<in> set xs. (x, y) \<in> (set rel)\<^sup>* )"
 proof -
   have "y \<in> set (common_reachable_nodes rel all xs) \<longleftrightarrow>
     y \<in> set all \<inter> \<Inter>{set ((reachable_nodes rel) x) | x. x \<in> set xs}" using int_bags_int by metis
   also have "... \<longleftrightarrow> y \<in> set all \<and> (\<forall>x \<in> set xs. y \<in> set ((reachable_nodes rel) x))" by auto
   finally show ?thesis using reachable_iff_in_star by metis
-qed
+qed *)
 
 (* if I fail to prove this, I can always use remdups as a crutch *)
 lemma reachable_dis: "distinct (reachable_nodes rel x)" sorry

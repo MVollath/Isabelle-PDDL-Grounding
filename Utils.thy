@@ -4,6 +4,29 @@ theory Utils
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
 begin
 
+(* syntax sugar *)
+
+text \<open> Not using the default list_all because it makes proofs cumbersome \<close>
+abbreviation (input) list_all1 where
+  "list_all1 P xs \<equiv> \<forall>x \<in> set xs. P x"
+
+(* rule rewriting *)
+
+lemma conj_split_4:
+  assumes "A \<and> B \<and> C \<and> D"
+  shows "A" "B" "C" "D"
+  using assms by simp_all
+
+lemma conj_split_5:
+  assumes "A \<and> B \<and> C \<and> D \<and> E"
+  shows "A" "B" "C" "D" "E"
+  using assms by simp_all
+
+lemma conj_split_7:
+  assumes "A \<and> B \<and> C \<and> D \<and> E \<and> F \<and> G"
+  shows "A" "B" "C" "D" "E" "F" "G"
+  using assms by simp_all
+
 (* formula helpers *)
 
 fun only_conj :: "'a formula \<Rightarrow> bool" where
@@ -32,49 +55,42 @@ lemma map_inj_dis:
   shows "distinct (map f xs)"
   using assms distinct_map subset_inj_on by blast
 
+lemma map_set_comprehension:
+  "{f (xs ! i) | i. i < length xs} = set (map f xs)"
+proof -
+  have "{f (xs ! i) | i. i < length xs} = {f x | x. x \<in> set xs}"
+    by (metis in_set_conv_nth)
+  thus ?thesis by auto
+qed
 
-(* rule rewriting *)
-
-lemma conj_split_4:
-  assumes "A \<and> B \<and> C \<and> D"
-  shows "A" "B" "C" "D"
-  using assms by simp_all
-
-lemma conj_split_5:
-  assumes "A \<and> B \<and> C \<and> D \<and> E"
-  shows "A" "B" "C" "D" "E"
-  using assms by simp_all
-
-lemma conj_split_7:
-  assumes "A \<and> B \<and> C \<and> D \<and> E \<and> F \<and> G"
-  shows "A" "B" "C" "D" "E" "F" "G"
-  using assms by simp_all
-
-subsection \<open> Static predicates \<close>
+subsection \<open> Formula Semantics \<close>
+(* Doesn't work with OR. But this isn't a problem since closed world entailment can
+   be represented as semantics of the world's valuation, and then we can apply
+   \<open>BigOr_semantics\<close> *)
+lemma bigAnd_entailment: "\<Gamma> \<TTurnstile> (\<^bold>\<And>F) \<longleftrightarrow>
+  (\<forall>f \<in> set F. \<Gamma> \<TTurnstile> f)"
+  unfolding entailment_def
+  by auto
 
 
 
-definition fmla_preds :: "'ent atom formula \<Rightarrow> predicate set" where
-  "fmla_preds F = {p | p xs. predAtm p xs \<in> atoms F}"
-lemma fmla_preds_simps [simp]:
-  "fmla_preds (Atom (predAtm p xs)) = {p}"
-  "fmla_preds (Atom (Eq a b)) = {}"
-  "fmla_preds \<bottom> = {}"
-  "fmla_preds (\<^bold>\<not> F) = fmla_preds F"
-  "fmla_preds (F1 \<^bold>\<and> F2) = fmla_preds F1 \<union> fmla_preds F2"
-  "fmla_preds (F1 \<^bold>\<or> F2) = fmla_preds F1 \<union> fmla_preds F2"
-  "fmla_preds (F1 \<^bold>\<rightarrow> F2) = fmla_preds F1 \<union> fmla_preds F2"
-    apply (force simp: fmla_preds_def)
-   apply (force simp: fmla_preds_def)
-   apply (force simp: fmla_preds_def)
-   apply (force simp: fmla_preds_def)
-   apply (force simp: fmla_preds_def)
-   apply (force simp: fmla_preds_def)
-  apply (force simp: fmla_preds_def)
-  done
+subsection \<open> Formula Preds \<close>
 
-lemma "p \<notin> fmla_preds F \<Longrightarrow> predAtm p xd \<notin> atoms F"
-  by (simp add: fmla_preds_def)
+fun fmla_preds :: "'ent atom formula \<Rightarrow> predicate set" where
+  "fmla_preds (Atom (predAtm p xs)) = {p}" |
+  "fmla_preds (Atom (Eq a b)) = {}" |
+  "fmla_preds \<bottom> = {}" |
+  "fmla_preds (\<^bold>\<not> \<phi>) = fmla_preds \<phi>" |
+  "fmla_preds (\<phi>\<^sub>1 \<^bold>\<and> \<phi>\<^sub>2) = fmla_preds \<phi>\<^sub>1 \<union> fmla_preds \<phi>\<^sub>2" |
+  "fmla_preds (\<phi>\<^sub>1 \<^bold>\<or> \<phi>\<^sub>2) = fmla_preds \<phi>\<^sub>1 \<union> fmla_preds \<phi>\<^sub>2" |
+  "fmla_preds (\<phi>\<^sub>1 \<^bold>\<rightarrow> \<phi>\<^sub>2) = fmla_preds \<phi>\<^sub>1 \<union> fmla_preds \<phi>\<^sub>2"
+
+lemma fmla_preds_alt: "fmla_preds \<phi> = {p | p xs. predAtm p xs \<in> atoms \<phi>}"
+  apply (induction \<phi>)
+  subgoal for x
+    apply (cases x; simp_all)
+    done
+  by auto
 
 lemma map_preserves_fmla_preds: "fmla_preds F = fmla_preds ((map_formula \<circ> map_atom) f F)"
 proof (induction F)
@@ -82,6 +98,8 @@ proof (induction F)
   thus ?case by (cases x) simp_all
 qed auto
 
+lemma notin_fmla_preds_notin_atoms: "p \<notin> fmla_preds \<phi> \<Longrightarrow> predAtm p args \<notin> atoms \<phi>"
+  using fmla_preds_alt by blast
 
 thm irrelevant_atom
 

@@ -5,7 +5,31 @@ theory Tests
     "Verified_SAT_Based_AI_Planning.STRIPS_Representation"
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker" *)
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
+    "HOL-Library.Monad_Syntax"
 begin
+
+datatype ('a, 'e) Err = Lef 'a | Rig 'e
+
+type_synonym ('a, 'e) err_ = "('a, 'e) Err" (infixl "#" 0)
+
+fun bind :: "('a # 'e) \<Rightarrow> ('a \<Rightarrow> ('b # 'e)) \<Rightarrow> ('b # 'e)" where
+  "bind (Lef x) f = f x"|
+  "bind (Rig e) f = Rig e"
+
+adhoc_overloading
+  Monad_Syntax.bind bind
+
+definition "dub x = Lef (x + x)"
+definition "odub x = Some (x + x)"
+
+value "(Rig False :: (nat, bool) Rrr) \<bind> dub"
+value "(None :: nat option) \<bind> odub"
+
+lemma "{x. \<exists>B \<in> s. x \<in> B} = \<Union>s" by auto
+lemma fixes a :: "'a set" shows "a \<bind> f = \<Union>(f ` a)"
+  by (rule Complete_Lattices.bind_UNION)
+
+value "Option.bind"
 
 (* ------------------------------------------------------------------------------------ *)
 
@@ -17,9 +41,6 @@ lemma a: "(0::nat) < 3 \<and> (0::nat) < 6 \<and> (0::nat) < 9" by simp
 
 thm conj3[OF a]
 
-(* how hacky is this? *)
-abbreviation uplus ("_ \<uplus> _ = _" 50) where
-  "a \<uplus> b = x \<equiv> disjnt a b \<and> a \<union> b = x"
 
 
 
