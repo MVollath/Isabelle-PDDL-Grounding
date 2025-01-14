@@ -64,6 +64,10 @@ proof -
 qed
 
 subsection \<open> Formula Semantics \<close>
+
+lemma entail_and: "A \<TTurnstile> a \<^bold>\<and> b \<longleftrightarrow> A \<TTurnstile> a \<and> A \<TTurnstile> b"
+  by (auto simp add: entailment_def)
+
 (* Doesn't work with OR. But this isn't a problem since closed world entailment can
    be represented as semantics of the world's valuation, and then we can apply
    \<open>BigOr_semantics\<close> *)
@@ -72,6 +76,23 @@ lemma bigAnd_entailment: "\<Gamma> \<TTurnstile> (\<^bold>\<And>F) \<longleftrig
   unfolding entailment_def
   by auto
 
+lemma bigAnd_map: "(\<^bold>\<And>(map (map_formula f) \<phi>s)) = map_formula f (\<^bold>\<And>\<phi>s)"
+  by (induction \<phi>s; simp_all)
+lemma bigOr_map: "(\<^bold>\<Or>(map (map_formula f) \<phi>s)) = map_formula f (\<^bold>\<Or>\<phi>s)"
+  by (induction \<phi>s; simp_all)
+
+lemma bigAnd_map_atom: "(\<^bold>\<And>(map ((map_formula \<circ> map_atom) f) \<phi>s)) =
+  (map_formula \<circ> map_atom) f (\<^bold>\<And>\<phi>s)"
+  using bigAnd_map by auto
+lemma bigOr_map_atom: "(\<^bold>\<Or>(map ((map_formula \<circ> map_atom) f) \<phi>s)) =
+  (map_formula \<circ> map_atom) f (\<^bold>\<Or>\<phi>s)"
+  using bigOr_map by auto
+
+lemma bigAnd_atoms: "atoms (\<^bold>\<And> \<phi>s) = \<Union>(atoms ` set \<phi>s)"
+  by (induction \<phi>s) simp_all
+
+lemma bigOr_atoms: "atoms (\<^bold>\<Or> \<phi>s) = \<Union>(atoms ` set \<phi>s)"
+  by (induction \<phi>s) simp_all
 
 
 subsection \<open> Formula Preds \<close>
@@ -91,6 +112,7 @@ lemma fmla_preds_alt: "fmla_preds \<phi> = {p | p xs. predAtm p xs \<in> atoms \
     apply (cases x; simp_all)
     done
   by auto
+
 
 lemma map_preserves_fmla_preds: "fmla_preds F = fmla_preds ((map_formula \<circ> map_atom) f F)"
 proof (induction F)

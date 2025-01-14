@@ -6,7 +6,10 @@ theory Tests
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker" *)
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
     "HOL-Library.Monad_Syntax"
+    "HOL-Library.Multiset"
 begin
+
+term "count"
 
 datatype ('a, 'e) Err = Lef 'a | Rig 'e
 
@@ -22,14 +25,12 @@ adhoc_overloading
 definition "dub x = Lef (x + x)"
 definition "odub x = Some (x + x)"
 
-value "(Rig False :: (nat, bool) Rrr) \<bind> dub"
+value "(Rig False :: nat # bool) \<bind> dub"
 value "(None :: nat option) \<bind> odub"
 
 lemma "{x. \<exists>B \<in> s. x \<in> B} = \<Union>s" by auto
 lemma fixes a :: "'a set" shows "a \<bind> f = \<Union>(f ` a)"
   by (rule Complete_Lattices.bind_UNION)
-
-value "Option.bind"
 
 (* ------------------------------------------------------------------------------------ *)
 

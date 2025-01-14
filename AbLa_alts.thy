@@ -26,8 +26,9 @@ abbreviation (input) get_t :: "type \<Rightarrow> name" where
 lemma get_t_alt: "get_t (Either (t # ts)) = t"
   by simp
 
-lemma is_predAtom_decomp: "is_predAtom \<phi> \<Longrightarrow> \<exists>p xs. \<phi> = Atom (predAtm p xs)"
-  apply (cases \<phi>)
+lemma is_predAtom_decomp: assumes "is_predAtom \<phi>"
+  obtains p xs where "\<phi> = Atom (predAtm p xs)"
+  using assms apply (cases \<phi>)
   apply (meson is_predAtom.elims(2))
   by simp_all
 
@@ -77,6 +78,10 @@ lemma (in wf_ast_domain) resolve_action_schema_cond:
   shows "resolve_action_schema n = Some (Action_Schema n params pre eff)"
   using assms wf_D(6)
   by (simp add: resolve_action_schema_def)
+
+fun subst_term_alt where
+    "subst_term_alt psubst (term.VAR x) = psubst x"
+  | "subst_term_alt psubst (term.CONST c) = c"
 
 definition ac_tsubst :: "(variable \<times> type) list \<Rightarrow> object list \<Rightarrow> (PDDL_STRIPS_Semantics.term \<Rightarrow> object)" where
   "ac_tsubst params args \<equiv> subst_term (the \<circ> (map_of (zip (map fst params) args)))"
