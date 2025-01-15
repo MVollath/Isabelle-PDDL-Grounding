@@ -805,11 +805,13 @@ text \<open> supertype_facts (init) \<close>
     "supertype_facts all_objects =
       concat (map (\<lambda>(n, T). map (type_atom n) (supertypes_of (get_t T))) all_objects)"
   proof -
-    have "\<forall>ob \<in> set all_objects. supertype_facts_for ob =
-      (\<lambda>(n, T). map (type_atom n) (supertypes_of (get_t T))) ob"
-      using single_t_objs superfacts_for_cond by fast
-    thus ?thesis unfolding supertype_facts_def
-      using map_eq_conv by (smt (verit) map_eq_conv)
+    define sffor :: "object \<times> type \<Rightarrow> object atom formula list"
+      where "sffor \<equiv> (\<lambda>(n, T). map (type_atom n) (supertypes_of (get_t T)))"
+    have "\<forall>ob \<in> set all_objects. supertype_facts_for ob = sffor ob"
+      using single_t_objs superfacts_for_cond sffor_def by fast
+    hence "supertype_facts all_objects = concat (map sffor all_objects)"
+      unfolding supertype_facts_def using map_eq_conv by (metis (mono_tags, lifting))
+    thus ?thesis unfolding sffor_def by simp
   qed
 
   (* I could do "p2.wf_world_model (set (supertype_facts_for ent))"
@@ -1454,7 +1456,7 @@ proof -
 qed
 
 (* BIG TODO: clean this up *)
-lemma (in restr_problem2)
+lemma (in restr_problem2) detype_init_enabled_iff:
   "plan_action_enabled \<pi> (set (init P)) \<longleftrightarrow>
    p2.plan_action_enabled \<pi> (set (init P2))"
 proof -
