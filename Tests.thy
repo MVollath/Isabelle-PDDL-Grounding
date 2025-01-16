@@ -11,6 +11,7 @@ begin
 
 term "count"
 
+
 datatype ('a, 'e) Err = Lef 'a | Rig 'e
 
 type_synonym ('a, 'e) err_ = "('a, 'e) Err" (infixl "#" 0)
