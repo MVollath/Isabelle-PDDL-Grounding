@@ -41,8 +41,7 @@ locale restr_problem = wf_ast_problem +
   assumes restrict_prob: restrict_prob
 
 sublocale restr_problem \<subseteq> restr_domain "D"
-  apply unfold_locales
-  using restrict_prob restrict_prob_def by simp
+  using restrict_prob restrict_prob_def by (unfold_locales) simp
 
 subsection \<open>Type Normalization\<close>
 
@@ -177,7 +176,7 @@ sublocale wf_ast_domain2 \<subseteq> ast_domain2 .
 locale restr_domain2 = restr_domain
 sublocale restr_domain2 \<subseteq> d2 : ast_domain D2 .
 sublocale restr_domain2 \<subseteq> wf_ast_domain2
-  apply unfold_locales .
+  by unfold_locales
 
 locale ast_problem2 = ast_problem
 sublocale ast_problem2 \<subseteq> p2: ast_problem P2 .
@@ -187,14 +186,14 @@ locale wf_ast_problem2 = wf_ast_problem
 sublocale wf_ast_problem2 \<subseteq> p2 : ast_problem P2.
 sublocale wf_ast_problem2 \<subseteq> ast_problem2 .
 sublocale wf_ast_problem2 \<subseteq> wf_ast_domain2 D
-  by (unfold_locales)
+  by unfold_locales
 
 locale restr_problem2 = restr_problem
 sublocale restr_problem2 \<subseteq> p2 : ast_problem P2 .
 sublocale restr_problem2 \<subseteq> wf_ast_problem2
-  by (unfold_locales)
+  by unfold_locales
 sublocale restr_problem2 \<subseteq> restr_domain2 D
-  by (unfold_locales)
+  by unfold_locales
 
 text \<open> Alternate/simplified definitions\<close>
 
@@ -215,6 +214,8 @@ lemma type_precond_alt: "type_precond p =
 
 lemma detype_ent_alt: "detype_ent x = (fst x, \<omega>)"
   by (cases x; simp)
+
+thm detype_ac.simps
 
 lemma detype_ac_alt: "detype_ac ac = Action_Schema
   (ac_name ac) (detype_ents (ac_params ac)) (param_precond (ac_params ac) \<^bold>\<and> (ac_pre ac)) (ac_eff ac)"
@@ -257,7 +258,7 @@ lemma (in restr_problem) restr_P: "single_types (objects P)" "only_conj (goal P)
 lemma (in restr_problem) single_t_objs: "single_types (all_objects)"
   using restr_D(1) restr_P(1) by auto
 
-text \<open> basic stuff \<close>
+text \<open> basic properties of Ab+La \<close>
 
   lemma dist_pred: "distinct (map Pred names) \<longleftrightarrow> distinct names"
     by (meson distinct_map inj_onI predicate.inject)
@@ -294,15 +295,25 @@ begin
   lemma tyterm_prop: "P (ty_term varT cnstT x) \<longleftrightarrow>
     (case x of term.VAR x' \<Rightarrow> P (varT x') |
                term.CONST x' \<Rightarrow> P (cnstT x'))"
-    apply (split term.split)
-    by simp
+    by (simp split: term.split)
 
   (* TODO: improve this to _eq_Some_iff *)
-  lemma tyterm_elem: "(ty_term (map_of varT) (map_of cnstT) x \<noteq> None)
+  lemma tyterm_elem: "ty_term (map_of varT) (map_of cnstT) x \<noteq> None
     \<longleftrightarrow> (case x of term.VAR x' \<Rightarrow> x' \<in> fst ` set varT |
                    term.CONST x' \<Rightarrow> x' \<in> fst ` set cnstT)"
-    apply (split term.split)
-    using tyterm_prop by (simp add: map_of_eq_None_iff)
+    by (simp add: map_of_in_R_iff split: term.split)
+
+lemma "ty_term varT cnstT x = Some y
+  \<longleftrightarrow> (case x of term.VAR x' \<Rightarrow> varT x' = Some y |
+                 term.CONST x' \<Rightarrow> cnstT x' = Some y)"
+  by (simp split: term.split)
+
+lemma tyterm_some:
+  assumes "distinct (map fst vars)" "distinct (map fst cnsts)"
+  shows "ty_term (map_of vars) (map_of cnsts) x = Some y
+  \<longleftrightarrow> (case x of term.VAR x' \<Rightarrow> (x', y) \<in> set vars |
+                 term.CONST x' \<Rightarrow> (x', y) \<in> set cnsts)"
+  using assms by (simp split: term.split)
 
 text \<open> type_names \<close>
 
@@ -567,18 +578,12 @@ text \<open> type maps \<close>
   lemma t_tyt_Some:
     assumes "ty_term (map_of vars) (map_of cnsts) e \<noteq> None"
     shows "ty_term (map_of (detype_ents vars)) (map_of (detype_ents cnsts)) e = Some \<omega>"
-    using assms apply (induction e)
-    apply (metis t_entT_Some ty_term.simps(1))
-    apply (metis t_entT_Some ty_term.simps(2))
-    done
+    using assms by (induction e) (metis t_entT_Some ty_term.simps)+
 
   lemma t_tyt_None:
     assumes "ty_term (map_of vars) (map_of cnsts) e = None"
     shows "ty_term (map_of (detype_ents vars)) (map_of (detype_ents cnsts)) e = None"
-    using assms apply (induction e)
-    apply (metis t_entT_None ty_term.simps(1))
-    apply (metis t_entT_None ty_term.simps(2))
-    done
+    using assms by (induction e) (metis t_entT_None ty_term.simps)+
 
   (* See \<open>t_ac_tyt\<close> for where the assumption comes from. *)
   lemma (in ast_domain2) t_tyt_params:
@@ -855,6 +860,139 @@ text \<open> supertype_facts (init) \<close>
     from c1 c23 show ?thesis
       using detype_prob_def supertype_facts_def p2.wf_world_model_def by auto
   qed
+
+  text \<open> Type atom/Supertype facts inclusion/exclusion/overlap \<close>
+
+subsubsection \<open> Type pred inclusion/exclusion/overlap \<close>
+(* TODO: reevaluate what is necessary, maybe use fmla_preds in proofs *)
+
+lemma (in restr_problem) sf_typeatms:
+  assumes "\<psi> \<in> sf_substate"
+  shows "\<exists>n t. \<psi> = type_atom n t"
+  using assms superfacts_unfolded by auto
+
+lemma (in ast_domain) wf_predatom_listed:
+  assumes "wf_pred_atom tyt (p, n)"
+  shows "p \<in> pred ` set (predicates D)"
+  using assms sig_None wf_pred_atom.simps
+  by (metis option.simps(4))
+
+lemma (in ast_domain) wf_fmlaatom_listed:
+  assumes "wf_fmla_atom tyt \<phi>"
+  shows "unPredAtom \<phi> \<in> pred ` set (predicates D)"
+  apply (cases rule: wf_fmla_atom.cases[of \<phi>])
+  using assms wf_predatom_listed by simp_all
+
+lemma (in ast_domain) wf_mapped_atom_neq_typeatom:
+  assumes "wf_fmla_atom tyt \<phi>"
+  shows "type_atom x t \<noteq> (map_formula \<circ> map_atom) f \<phi>"
+proof -
+  let ?map = "(map_formula \<circ> map_atom) f"
+  have "unPredAtom \<phi> = unPredAtom (?map \<phi>)"
+    using assms by (cases rule: wf_fmla_atom.cases[of \<phi>]) auto
+  with assms have "unPredAtom (?map \<phi>) \<in> pred ` set (predicates D)"
+    using wf_fmlaatom_listed by metis
+  moreover have "unPredAtom (type_atom x t) \<notin> pred ` set (predicates D)"
+    using type_pred_notin by simp
+  ultimately show ?thesis by metis
+qed
+
+lemma (in ast_domain) wf_atom_neq_typeatom:
+  assumes "wf_fmla_atom tyt \<phi>"
+  shows "type_atom x t \<noteq> \<phi>"
+  using assms wf_mapped_atom_neq_typeatom by fastforce
+
+lemma (in ast_domain) predatm_notin_wf_atms:
+  assumes "wf_fmla tyt \<phi>"
+  shows "type_predatm n t \<notin> atoms \<phi>"
+  using assms apply (induction \<phi>)
+  using wf_atom_neq_typeatom by force+
+
+(* important lemmas for next theorems *)
+lemma (in restr_problem) sf_disj_wf_atoms:
+  assumes "wf_fmla tyt \<phi>"
+  shows "\<forall>\<psi> \<in> sf_substate. un_Atom \<psi> \<notin> atoms \<phi>"
+  using assms sf_typeatms predatm_notin_wf_atms by fastforce
+
+lemma (in ast_domain) predatm_notin_wf_atms_mapped:
+  assumes "wf_fmla tyt \<phi>"
+  shows "type_predatm n t \<notin> map_atom f ` atoms \<phi>"
+using assms proof (induction \<phi>)
+  case (Atom x)
+  then show ?case
+  proof (cases x)
+    case (predAtm p xs)
+    hence "wf_fmla_atom tyt (Atom x)" using Atom.prems wf_fmla_atom_alt by simp
+    hence "unPredAtom (Atom x) \<in> pred ` set (predicates D)" using wf_fmlaatom_listed by blast
+    hence "map_atom f x \<noteq> type_predatm n t" using predAtm type_pred_notin by force
+    thus ?thesis by simp
+  qed simp (* "Eq a b" obviously doesn't contain a type_predatm *)
+qed auto
+
+lemma (in restr_problem) sf_disj_wf_atoms_mapped:
+  assumes "wf_fmla tyt \<phi>"
+  shows "\<forall>\<psi> \<in> sf_substate. un_Atom \<psi> \<notin> atoms ((map_formula \<circ> map_atom) f \<phi>)"
+proof -
+  have "atoms ((map_formula \<circ> map_atom) f \<phi>) = map_atom f ` atoms \<phi>"
+    by (simp add: formula.set_map)
+  thus ?thesis using sf_typeatms predatm_notin_wf_atms_mapped[OF assms] by fastforce
+qed
+
+lemma (in -) "map_ast_effect f (Effect A D) =
+  Effect (map ((map_formula \<circ> map_atom) f) A) (map ((map_formula \<circ> map_atom) f) D)"
+  by simp
+
+lemma (in restr_problem) sf_disj_wf_eff:
+  assumes "wf_effect tyt \<epsilon>"
+  shows "sf_substate \<inter> set (adds (map_ast_effect f \<epsilon>)) = {}"
+    "sf_substate \<inter> set (dels (map_ast_effect f \<epsilon>)) = {}"
+proof -
+  from assms obtain tyt where
+    "\<forall>a \<in> set (adds \<epsilon>). wf_fmla_atom tyt a"
+    "\<forall>a \<in> set (dels \<epsilon>). wf_fmla_atom tyt a"
+    by (cases \<epsilon>) auto
+  hence
+    "\<forall>a \<in> set (adds \<epsilon>). (map_formula \<circ> map_atom) f a \<notin> sf_substate"
+    "\<forall>a \<in> set (dels \<epsilon>). (map_formula \<circ> map_atom) f a \<notin> sf_substate"
+    using wf_mapped_atom_neq_typeatom sf_typeatms by metis+
+  thus
+    "sf_substate \<inter> set (adds (map_ast_effect f \<epsilon>)) = {}"
+    "sf_substate \<inter> set (dels (map_ast_effect f \<epsilon>)) = {}"
+    by (auto simp add: ast_effect.map_sel)
+qed
+
+thm ast_domain.wf_atom_neq_typeatom
+
+(* important lemmas for next theorems *)
+lemma (in ast_domain) wf_atom_notin_mapped_param_precond:
+  assumes "wf_fmla_atom tyt \<phi>"
+  shows "un_Atom \<phi> \<notin> atoms ((map_formula \<circ> map_atom) f (param_precond params))"
+proof -
+  term \<phi>
+  let ?map = "(map_formula \<circ> map_atom) f"
+  (* sort of the definition of type_precond unfolded *)
+  have 1: "\<forall>t \<in> set ts. \<forall> \<alpha> \<in> atoms (type_atom (term.VAR v) t). \<exists>n t. \<alpha> = type_predatm n t"
+    for v ts by auto
+  hence "\<forall>\<phi> \<in> set (map (?map \<circ> (type_atom (term.VAR v))) ts). \<forall> \<alpha> \<in> atoms \<phi>. \<exists>n t. \<alpha> = type_predatm n t"
+    for v ts by simp
+  hence "\<forall>\<alpha> \<in> atoms (?map (\<^bold>\<Or>(map (type_atom (term.VAR v)) ts))). \<exists>n t. \<alpha> = type_predatm n t"
+    for v ts by (induction ts; auto)
+  hence "\<forall>\<alpha> \<in> atoms (?map (type_precond param)). \<exists>n t. \<alpha> = type_predatm n t" for param
+    by (cases rule: type_precond.cases[of param]) simp
+  hence "\<forall>\<alpha> \<in> atoms (?map (param_precond params)). \<exists>n t. \<alpha> = type_predatm n t"
+    by (induction params) (auto simp add: param_precond_def)
+
+  moreover have "un_Atom \<phi> \<noteq> type_predatm n t" for n t
+    using assms wf_atom_neq_typeatom by (cases \<phi>; fastforce)
+
+  ultimately show ?thesis using assms by auto
+qed
+
+lemma (in ast_domain) mapped_param_precond_type_atoms:
+  "\<forall>a \<in> atoms ((map_formula \<circ> map_atom) f (param_precond params)).
+   \<exists>x t. type_predatm x t = a"
+  sorry
+
 
 text \<open> goal \<close>
 
@@ -1168,100 +1306,7 @@ lemma
   using assms valuation_iff_close_world by force
 
 end
-subsubsection \<open> Type pred inclusion/exclusion/overlap \<close>
 
-(* TODO: reevaluate what is necessary, maybe use fmla_preds in proofs *)
-
-lemma (in restr_problem) sf_typeatms:
-  assumes "\<psi> \<in> sf_substate"
-  shows "\<exists>n t. \<psi> = type_atom n t"
-  using assms superfacts_unfolded by auto
-
-lemma (in ast_domain) wf_predatom_listed:
-  assumes "wf_pred_atom tyt (p, n)"
-  shows "p \<in> pred ` set (predicates D)"
-  using assms sig_None wf_pred_atom.simps
-  by (metis option.simps(4))
-
-lemma (in ast_domain) wf_fmlaatom_listed:
-  assumes "wf_fmla_atom tyt \<phi>"
-  shows "unPredAtom \<phi> \<in> pred ` set (predicates D)"
-  apply (cases rule: wf_fmla_atom.cases[of \<phi>])
-  using assms wf_predatom_listed by simp_all
-
-lemma (in ast_domain) wf_atom_neq_typeatom:
-  assumes "wf_fmla_atom tyt \<phi>"
-  shows "type_atom x t \<noteq> \<phi>"
-proof -
-  from assms have "unPredAtom \<phi> \<in> pred ` set (predicates D)"
-    using wf_fmlaatom_listed by auto
-  moreover have "unPredAtom (type_atom x t) \<notin> pred ` set (predicates D)"
-    using type_pred_notin by simp
-  ultimately show ?thesis by auto
-qed
-
-lemma (in ast_domain) predatm_notin_wf_atms:
-  assumes "wf_fmla tyt \<phi>"
-  shows "type_predatm n t \<notin> atoms \<phi>"
-  using assms apply (induction \<phi>)
-  using wf_atom_neq_typeatom by force+
-
-(* important lemmas for next theorems *)
-lemma (in restr_problem) sf_disj_wf_atoms:
-  assumes "wf_fmla tyt \<phi>"
-  shows "\<forall>\<psi> \<in> sf_substate. un_Atom \<psi> \<notin> atoms \<phi>"
-  using assms sf_typeatms predatm_notin_wf_atms by fastforce
-
-lemma (in ast_domain) predatm_notin_wf_atms_mapped:
-  assumes "wf_fmla tyt \<phi>"
-  shows "type_predatm n t \<notin> map_atom f ` atoms \<phi>"
-using assms proof (induction \<phi>)
-  case (Atom x)
-  then show ?case
-  proof (cases x)
-    case (predAtm p xs)
-    hence "wf_fmla_atom tyt (Atom x)" using Atom.prems wf_fmla_atom_alt by simp
-    hence "unPredAtom (Atom x) \<in> pred ` set (predicates D)" using wf_fmlaatom_listed by blast
-    hence "map_atom f x \<noteq> type_predatm n t" using predAtm type_pred_notin by force
-    thus ?thesis by simp
-  qed simp (* "Eq a b" obviously doesn't contain a type_predatm *)
-qed auto
-
-lemma (in restr_problem) sf_disj_wf_atoms_mapped:
-  assumes "wf_fmla tyt \<phi>"
-  shows "\<forall>\<psi> \<in> sf_substate. un_Atom \<psi> \<notin> atoms ((map_formula \<circ> map_atom) f \<phi>)"
-proof -
-  have "atoms ((map_formula \<circ> map_atom) f \<phi>) = map_atom f ` atoms \<phi>"
-    by (simp add: formula.set_map)
-  thus ?thesis using sf_typeatms predatm_notin_wf_atms_mapped[OF assms] by fastforce
-qed
-
-thm ast_domain.wf_atom_neq_typeatom
-
-(* important lemmas for next theorems *)
-lemma (in ast_domain) wf_atom_notin_mapped_param_precond:
-  assumes "wf_fmla_atom tyt \<phi>"
-  shows "un_Atom \<phi> \<notin> atoms ((map_formula \<circ> map_atom) f (param_precond params))"
-proof -
-  term \<phi>
-  let ?map = "(map_formula \<circ> map_atom) f"
-  (* sort of the definition of type_precond unfolded *)
-  have 1: "\<forall>t \<in> set ts. \<forall> \<alpha> \<in> atoms (type_atom (term.VAR v) t). \<exists>n t. \<alpha> = type_predatm n t"
-    for v ts by auto
-  hence "\<forall>\<phi> \<in> set (map (?map \<circ> (type_atom (term.VAR v))) ts). \<forall> \<alpha> \<in> atoms \<phi>. \<exists>n t. \<alpha> = type_predatm n t"
-    for v ts by simp
-  hence "\<forall>\<alpha> \<in> atoms (?map (\<^bold>\<Or>(map (type_atom (term.VAR v)) ts))). \<exists>n t. \<alpha> = type_predatm n t"
-    for v ts by (induction ts; auto)
-  hence "\<forall>\<alpha> \<in> atoms (?map (type_precond param)). \<exists>n t. \<alpha> = type_predatm n t" for param
-    by (cases rule: type_precond.cases[of param]) simp
-  hence "\<forall>\<alpha> \<in> atoms (?map (param_precond params)). \<exists>n t. \<alpha> = type_predatm n t"
-    by (induction params) (auto simp add: param_precond_def)
-
-  moreover have "un_Atom \<phi> \<noteq> type_predatm n t" for n t
-    using assms wf_atom_neq_typeatom by (cases \<phi>; fastforce)
-
-  ultimately show ?thesis using assms by auto
-qed
 
 (* INSTANTIATE STUFF *)
 
@@ -1271,6 +1316,12 @@ lemma (in ast_problem) wf_pa_refs_ac:
   obtains ac where "resolve_action_schema n = Some ac" "ac \<in> set (actions D)" "ac_name ac = n"
   using assms wf_plan_action.simps resolve_action_schema_def index_by_eq_SomeD
   by (smt (verit, ccfv_threshold) option.case_eq_if option.collapse)
+
+
+lemma (in wf_ast_problem) res_aux:
+  "resolve_action_schema n = Some ac \<longleftrightarrow>
+     ac \<in> set (actions D) \<and> ac_name ac = n"
+  by (simp add: resolve_action_schema_def wf_DP(6))
 
 lemma (in restr_problem2) t_resinst:
   assumes "resolve_action_schema n = Some ac"
@@ -1288,6 +1339,22 @@ proof -
 qed
 
 lemma (in restr_problem2) t_resinst_inv:
+  assumes "p2.resolve_action_schema n = Some ac2"
+  obtains ac where
+    "detype_ac ac = ac2"
+    "ac \<in> set (actions D)"
+    "resolve_action_schema n = Some ac"
+proof -
+  from assms obtain ac where ac: "detype_ac ac = ac2" and ac_in: "ac \<in> set (actions D)"
+    using detype_dom_sel(4) detype_prob_sel(1) p2.res_aux by auto
+  hence "ac_name (detype_ac ac) = n"
+    using p2.resolve_action_schema_def index_by_eq_SomeD assms by metis
+  hence "ac_name ac = n" using t_ac_name by simp
+  thus ?thesis using that ac ac_in resolve_action_schema_def wf_DP(6) by simp
+qed
+
+
+lemma (in restr_problem2)
   assumes "d2.resolve_action_schema n = Some (detype_ac ac)" "ac \<in> set (actions D)"
   shows "resolve_action_schema n = Some ac"
 proof -
@@ -1298,10 +1365,6 @@ proof -
     by (simp add: assms(2) resolve_action_schema_def wf_DP(6))
 qed
 
-lemma (in wf_ast_problem) res_aux:
-  "resolve_action_schema n = Some ac \<longleftrightarrow>
-     ac \<in> set (actions D) \<and> ac_name ac = n"
-  by (simp add: resolve_action_schema_def wf_DP(6))
 
 
 subsubsection \<open> Semantics \<close>
@@ -1348,7 +1411,10 @@ lemma (in wf_ast_problem) "wf_plan_action \<pi> \<Longrightarrow> wf_effect objT
   apply (simp split: option.splits)
   using wf_effect_inst_alt by simp *)
 
-lemma (in restr_problem2) t_params_match:
+context restr_problem2
+begin
+
+lemma t_params_match:
   assumes "action_params_match ac args"
   shows "p2.action_params_match (detype_ac ac) args"
 proof -
@@ -1371,12 +1437,12 @@ proof -
     by (simp add: len2 list_all2_conv_all_nth p2.action_params_match_def)
 qed
 
-lemma (in restr_problem2) sf_disj_wf:
+lemma sf_disj_wf:
   "wf_world_model s \<Longrightarrow> s \<inter> sf_substate = {}"
   by (metis Int_emptyI sf_typeatms wf_atom_neq_typeatom wf_world_model_def)
 
 (* TODO clean this up, if possible *)
-lemma (in restr_problem2) detyped_planaction_enabled_iff:
+lemma detyped_planaction_enabled_iff:
   assumes "wf_world_model s"
   shows "plan_action_enabled \<pi> s \<longleftrightarrow> p2.plan_action_enabled \<pi> (s \<union> sf_substate)"
 proof -
@@ -1454,9 +1520,7 @@ proof -
     from wf2 obtain ac2 where res2: "p2.resolve_action_schema n = Some ac2"
       using p2.wf_pa_refs_ac by metis
     then obtain ac where ac[simp]: "ac2 = detype_ac ac" and ac_in: "ac \<in> set (actions D)"
-      using detype_dom_sel(4) detype_prob_sel(1) p2.res_aux by auto
-    have res: "resolve_action_schema n = Some ac" using res2 ac_in
-      by (simp add: detype_prob_sel(1) t_resinst_inv)
+      and res: "resolve_action_schema n = Some ac" by (metis t_resinst_inv)
 
     (* parameter mappings *)
     let ?pre_map2 = "(map_formula \<circ> map_atom) (ac_tsubst (ac_params ac2) args)"
@@ -1514,8 +1578,148 @@ proof -
   ultimately show ?thesis using pi by auto
 qed
 
-term ast_problem.execute_plan_action
+(*
+  1. p2.wf_wm just follows directly from wf execution. Maybe not necessary
+  2. M satisfies all previous type facts
+  3. M won't satisfy any new type facts
+  from 2, 3 follows: type_atom \<in> M \<longleftrightarrow> type_atom \<in> sf_substate
+*)
 
+abbreviation reachable_prop :: "world_model \<Rightarrow> bool" where
+  "reachable_prop M \<equiv>
+    \<forall>x t. type_atom x t \<in> M \<longleftrightarrow> type_atom x t \<in> sf_substate"
+abbreviation (input) "RP \<equiv> reachable_prop"
+
+(*definition reachable_prop :: "world_model \<Rightarrow> bool" where
+  "reachable_prop M \<equiv>
+    p2.wf_world_model M \<and>
+    sf_substate \<subseteq> M \<and>
+    wf_world_model (M - sf_substate)"
+
+
+lemma typeatom_in_rp_iff:
+  assumes "RP M"
+  shows "type_atom x t \<in> M \<longleftrightarrow> type_atom x t \<in> sf_substate"
+  using assms unfolding reachable_prop_def wf_world_model_def
+  using wf_fmla_atom_alt wf_atom_neq_typeatom sf_typeatms by fast *)
+
+(*lemma rp_init:
+  shows "RP (set (init P2))"
+proof -
+  have "p2.wf_world_model (set (init P2))" using p2.wf_P(4) by simp
+  moreover have "sf_substate \<subseteq> (set (init P2))" using detype_prob_sel(3) by simp
+  moreover have "set (init P2) - sf_substate = set (init P)"
+    using detype_prob_sel(3) wf_P(4) sf_disj_wf by auto
+  ultimately show ?thesis using reachable_prop_def
+    using wf_P(4) by presburger
+qed*)
+
+lemma rp_init: "RP (set (init P2))"
+proof -
+  have "set (init P2) = set (init P) \<union> sf_substate" using detype_prob_sel(3) by auto
+  moreover have "type_atom x t \<notin> set (init P)" for x t
+    using wf_atom_neq_typeatom wf_P(4) wf_world_model_def by metis
+  ultimately show ?thesis by simp
+qed
+
+lemma "RP sf_substate" by simp
+
+lemma rp_type_precond_iff:
+  assumes "RP M"
+  shows "M \<^sup>c\<TTurnstile>\<^sub>= (map_formula \<circ> map_atom) f (param_precond params)
+      \<longleftrightarrow> sf_substate \<^sup>c\<TTurnstile>\<^sub>= (map_formula \<circ> map_atom) f (param_precond params)"
+proof -
+  from assms have "sf_substate \<subseteq> M" using sf_typeatms by blast
+  hence 0: "sf_substate \<union> (M - sf_substate) = M"
+    using assms by auto
+  have 1: "\<forall>\<phi> \<in> M - sf_substate. wf_fmla_atom objT \<phi>"
+    using assms wf_world_model_def by simp
+  hence 2: "\<forall>\<phi> \<in> M - sf_substate. un_Atom \<phi> \<notin> atoms ((map_formula \<circ> map_atom) f (param_precond params))"
+    using wf_atom_notin_mapped_param_precond by blast
+  moreover have "M - sf_substate \<union> sf_substate = M"
+    using assms by auto
+  moreover have "wm_basic (M - sf_substate)" using wm_basic_def wf_fmla_atom_alt
+    by (metis 1)
+  note entail_adds_irrelevant[OF sf_basic this 2]
+  thus ?thesis using 0 by simp
+qed
+lemma params_match_iff_rp_type_precond:
+  assumes "RP M" "wf_action_schema ac"
+  shows "action_params_match ac args =
+(length (ac_params ac) = length args \<and>
+ M \<^sup>c\<TTurnstile>\<^sub>=
+ (map_formula \<circ> map_atom) (d2.ac_tsubst (ac_params ac) args) (param_precond (ac_params ac)))"
+  using assms rp_type_precond_iff params_match_iff_type_precond by simp
+
+thm wf_atom_notin_mapped_param_precond
+thm params_match_iff_type_precond
+thm entail_adds_irrelevant
+
+thm wf_atom_neq_typeatom
+
+
+
+thm typeatm_iff_obj_listed
+thm obj_of_type_iff
+
+lemma exec2_invariant:
+  assumes
+    "p2.wf_plan_action \<pi>"
+    "p2.execute_plan_action \<pi> s = s'"
+    "RP s"
+  shows "RP s'"
+proof -
+  obtain n args where pi: "\<pi> = PAction n args" by (cases \<pi>) simp
+  from assms(1) obtain ac2 where res2: "p2.resolve_action_schema n = Some ac2" using pi by fastforce
+  then obtain ac where ac[simp]: "ac2 = detype_ac ac" and ac_in: "ac \<in> set (actions D)"
+    and res: "resolve_action_schema n = Some ac" using t_resinst_inv by metis
+
+  hence wf: "wf_effect (ac_tyt ac) (ac_eff ac)"
+    using wf_D(7) ac_in by (simp add: wf_action_schema_alt)
+
+  have "p2.resolve_instantiate \<pi> = (d2.instantiate_action_schema ac2 args)"
+    by (simp add: pi res2)
+  moreover have eff_eq: "ac_eff ac = ac_eff ac2" using detype_ac_alt by simp
+  ultimately have 2: "effect (p2.resolve_instantiate \<pi>) =
+    map_ast_effect (d2.ac_tsubst (ac_params ac2) args) (ac_eff ac)"
+    using d2.instantiate_action_schema_alt by simp
+  hence
+    "type_atom x t \<notin> set (adds (effect (p2.resolve_instantiate \<pi>)))"
+    "type_atom x t \<notin> set (dels (effect (p2.resolve_instantiate \<pi>)))" for x t
+    using wf sorry
+
+  thus ?thesis using sf_typeatms p2.execute_plan_action_def d2.apply_effect_alt
+    assms(2-3) by auto
+qed
+
+(*lemma
+  assumes
+    "p2.wf_plan_action \<pi>"
+    "p2.execute_plan_action \<pi> s = s'"
+  shows "s \<inter> sf_substate = s' \<inter> sf_substate"
+proof -
+  obtain n args where pi: "\<pi> = PAction n args" by (cases \<pi>) simp
+  from assms(1) obtain ac2 where res2: "p2.resolve_action_schema n = Some ac2" using pi by fastforce
+  then obtain ac where ac[simp]: "ac2 = detype_ac ac" and ac_in: "ac \<in> set (actions D)"
+    and res: "resolve_action_schema n = Some ac" using t_resinst_inv by metis
+
+  hence wf: "wf_effect (ac_tyt ac) (ac_eff ac)"
+    using wf_D(7) ac_in by (simp add: wf_action_schema_alt)
+
+  have "p2.resolve_instantiate \<pi> = (d2.instantiate_action_schema ac2 args)"
+    by (simp add: pi res2)
+  moreover have eff_eq: "ac_eff ac = ac_eff ac2" using detype_ac_alt by simp
+  ultimately have "effect (p2.resolve_instantiate \<pi>) =
+    map_ast_effect (d2.ac_tsubst (ac_params ac2) args) (ac_eff ac)"
+    using d2.instantiate_action_schema_alt by simp
+  hence
+    "sf_substate \<inter> set (adds (effect (p2.resolve_instantiate \<pi>))) = {}"
+    "sf_substate \<inter> set (dels (effect (p2.resolve_instantiate \<pi>))) = {}"
+    using sf_disj_wf_eff[OF wf] by simp_all
+  thus ?thesis using p2.execute_plan_action_def d2.apply_effect_alt assms(2) by auto
+qed*)
+
+end
 
 
 
@@ -1524,17 +1728,7 @@ term ast_problem.execute_plan_action
 context restr_problem2
 begin
 
-lemma sf_exec_invariant:
-  assumes
-    "p2.wf_plan_action \<pi>"
-    "p2.execute_plan_action \<pi> s = s'"
-  shows "s \<inter> sf_substate = s' \<inter> sf_substate"
-proof -
-  let ?ai = "p2.resolve_instantiate \<pi>"
-  note resolve_instantiate_cond
-  note wf_instantiate_action_schema
-  thus ?thesis sorry
-qed
+
 
 lemma detyped_exec:
   assumes "wf_world_model s" "s' \<inter> sf_substate = {}"

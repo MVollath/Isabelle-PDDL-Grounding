@@ -9,6 +9,24 @@ theory Tests
     "HOL-Library.Multiset"
 begin
 
+thm valuation_iff_close_world
+thm valuation_def
+
+definition shave :: "world_model \<Rightarrow> world_model"
+  where "shave M \<equiv> {\<phi> \<in> M. is_predAtom \<phi>}"
+
+lemma "valuation (shave M) = valuation M"
+proof -
+  have "Atom (predAtm p xs) \<in> M \<longleftrightarrow> Atom (predAtm p xs) \<in> shave M" for p xs
+    using shave_def by simp
+  thus ?thesis using valuation_def by presburger
+qed
+
+term "(\<^sup>c\<TTurnstile>\<^sub>=)"
+
+
+
+
 term "count"
 
 
