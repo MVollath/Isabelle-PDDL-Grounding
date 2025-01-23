@@ -6,20 +6,22 @@
 
 \subsection{PDDL}
 The Planning Domain Definition Language (PDDL) is the de facto standard artificial intelligence planning language and is commonly used in planning competitions.
-A PDDL task defines variables with which parameterized predicates and actions can be instantiated. PDDL is commonly referred to as a first-order planning language because e.g. action preconditions are first-order formulas over the predicates.
+A PDDL task defines variables with which parameterized predicates and actions can be instantiated. PDDL is commonly referred to as a first-order planning language because of the use of predicate logic and first-order formulas.
 There are multiple versions and levels of PDDL and we are concerned with the abstract syntax specified in \cite{AbLa}, which my implementation builds upon.
 It is very similar to the syntax used by Helmert but differs in a few ways which I will highlight.
+
 PDDL tasks are commonly divided into domain and problem.
 
 \subsubsection{Abstract Syntax}
 A PDDL domain is a tuple $\langle\mathcal T, \mathcal P, \mathcal C, \mathcal A\rangle$.
 
 The set of \textit{primitive} types and their hierarchy are defined by the directed graph $\mathcal T$. Every node corresponds to a type and the edge $(a, b)$ signifies that $a$ directly inherits $b$.
-\cite{AbLa} supports Either types. Hence, a type is a list of primitive type alternatives. Intuitively, this means that certain variables can be instantiated by differently typed objects.
+\cite{AbLa} supports Either types. Hence, a type is a list of primitive type alternatives. Intuitively, this means that certain variables can be instantiated by differently typed objects. In Helmert, types aren't explicitly part of the formalism but it is mentioned that they are removed in the normalization step.
 
 $\mathcal C$ is the set of constants; a set of symbols that are assigned a type. Although \cite{AbLa} allow constants to have multiple types, I restrict them to singular types instead, in order to be consistent with Helmert and Correa.
 
 $\mathcal P$ is the set of predicate symbols. Each predicate symbol additionally has a corresponding signature expressed as a list of types. A predicate can be instantiated with an appropriate list of constants or variables (see below) to form a binary variable called atom. A ground atom is an atom that only refers to constants.
+Equality and inequality can be modeled by predicates. However, some formalizations such as \cite{AbLa} (and Correa), consider equality (or inequality, respectively) a built-in binary predicate.
 
 A state is a set of ground atoms and thus defines a valuation of these binary variables.
 
@@ -28,6 +30,7 @@ The parameter list defines variables and assigns a type to each one of them.
 The precondition is a formula over predicate atoms instantiated with domain constants and/or parameter variables.
 Helmert allows these formulas to contain first-order quantifiers, but \cite{AbLa} restricts them to propositional formulas.
 The atoms in the effect are likewise instantiated with constants and/or variables.
+\warn{Helmert supports nested effect preconditions}
 In other formalizations, the action parameters are often implicitly defined via the open variables in the precondition and the effect. However, I decided against that due to ambiguities that may arise from the use of Either types and for the sake of simplicity.
 
 A PDDL problem is a tuple $\langle\mathcal D, \mathcal O, \mathcal I, \mathcal G\rangle$. $\mathcal D$ simply refers to a domain and $\mathcal O$ (O for objects) is an additional set of constants, like $\mathcal C$.
@@ -37,18 +40,103 @@ The initial state $\mathcal I$ is simply a state, and the goal $\mathcal G$ is a
 Helmert does not distinguish between domain and problem, but that has no bearing on the semantics.
 However, Helmert allows for the definition of axioms (\todo{explain}), even though Correa et al later omit them. Axioms are sets of rules that define new predicate atoms based on which atoms are true in a given state.
 
+An important concept is well-formedness of a PDDL task.
+\warn{well-formedness, type graph unrestricted, object is predefined type}
+
 \subsubsection{Semantics}
 
 Actions can refer to constants from $\mathcal C$ but not those from $\mathcal O$. Other than that, there is no semantic bearing on whether a constant is defined at the domain-level or the problem-level.
 
+\subsubsection{Example}
 
-
+\warn{running example: delivery problem}
 
 \subsection{STRIPS}
 
+\warn{
+\begin{itemize}
+	\item grounded PDDL
+	\item propositional logic only
+\end{itemize}
+}
+
+
+\subsubsection{Abstraxt Syntax}
+
+\warn{
+\begin{itemize}
+	\item Ab+Ku specification + implementation: no overlap between add/del, goal allowed to contain negative literals
+	\item Ab+Ku specifics: goal allowed to contain negative literals
+	\item vs \SASP
+\end{itemize}
+}
+
+\subsubsection{Semantics}
+\warn{\begin{itemize}
+	\item parallel plans: not necessary
+	\item Ab+Ku: if operator isn't enabled, it does NOOP.
+\end{itemize}}
+
+\subsubsection{Example}
 
 \subsection{Datalog}
 
+\warn{
+\begin{itemize}
+	\item $\mathcal F$ facts, $\mathcal R$ disjunctive rules
+	\item unique stable model "canonical model"
+	\item constructed iteratively from facts
+\end{itemize}
+}
+
 \section{Grounding Process by Helmert}
+\warn{\begin{itemize}
+	\item Fast-Downward planning system
+	\item Commonly used
+	\item Invariant Synthesis (skipped because not necessary for STRIPS); orthogonal to grounding, so can just be applied to STRIPS afterwards.
+\end{itemize}}
+
+\subsection{Normalization}
+\warn{\begin{itemize}
+	\item remove types
+	\item simplify formulas in conditions and goal
+	\item normally invariant synthesis right afterwards, but can also be done after grounding.
+\end{itemize}}
+
+\subsection{Reachability Analysis}
+\warn{\begin{itemize}
+	\item Relaxed Task: negative literals assumed to be true, thus superset of reachable states.
+	\item Datalog generation
+	\item Rule decomposition
+	\item (iterated) solving
+	\item ground instance. Output normally: finite-domain. Here: STRIPS
+\end{itemize}}
 
 \section{Grounding Process by Correa}
+\warn{\begin{itemize}
+	\item (?) good space efficiency, but time overhead. Grounds more problems but slower
+	\item PDDL format differences: omit minor features present in Helmert's definition, but the main thing is $\neq$ as built-in predicate, like how Ab+La has $=$.
+\end{itemize}}
+
+\subsection{Rule Decomposition with Tree Decomposition}
+\warn{\begin{itemize}
+	\item primal graph for rule
+	\item tree decomposition
+	\item tree width
+	\item tree decompose this graph with lpopt
+\end{itemize}}
+\subsection{Two-Step Reachability Analysis}
+\warn{\begin{itemize}
+	\item avoid grounding actions at first to keep tree width low
+	\item encode type predicates (or alternative unary predicates)
+	\item iterated neq
+	\item inequalities only considered in second phase to keep tree-width low (kind of what I'm doing, since Eq is a builtin predicate in Ab+La)
+\end{itemize}}
+
+\section{Isabelle}
+\warn{\begin{itemize}
+	\item Interactive proof assistant
+	\item implementation with functional programming
+	\item write proofs that are automatically validated
+	\item code can be automatically translated into standard ML
+\end{itemize}}

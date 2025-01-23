@@ -1,130 +1,5 @@
-Background (Planning languages + ...Isabelle?)
-	General stuff about this project: PDDL -> SAS+, but I do -> STRIPS
-	PDDL
-		first order logic
-		Ab+La specifics:
-			Either[]
-			type graph unrestricted
-			"object" is pre-defined type
-			no effect preconditions
-		well-formedness
-	grounded format: STRIPS
-		propositional logic
-		Ab+Ku specifics:
-			goal allowed to contain negative literals
-	SAS+ vs STRIPS
-	Datalog
-		F facts, R disjunctive rules
-		unique stable model "canonical model"
-		constructed iteratively from facts
-
-	Helmert high-level
-		Fast Downward planning system
-		Format differences
-			effects nested conditions
-			axioms
-			types not explicitly part of formalism, but types still removed in type normalization
-		Algorithm:
-			Normalization (remove types, simplify formulas in conditions and goal)
-			Invariant Synthesis (skipped because not necessary for STRIPS)
-				Orthogonal to grounding, so can just be applied to STRIPS then
-			Relaxed Reachability
-				negative literals assumed to be true, thus superset of reachable states
-			Datalog generation, Rule decomposition, solving
-			Ground Instance. Output normally: finite-domain. Here: STRIPS (binary variables)
-	Correa high-level
-		(?) good space efficiency, but time overhead. Grounds more problems but slower
-		Format differences
-			PDDL has \neq as built-in predicate, like Ab+La
-		Advanced rule decomp
-			primal graph for rule
-			tree decompose this graph with lpopt
-		iterated
-			avoid grounding actions at first
-			encoding type predicates
-		iterated neq
-			inequalities only considered in second phase
-			Kind of what I'm doing, since Eq is a builtin predicate in Ab+La
-	Isabelle
-		Interactive Proof assistant
-		Implementation with functional programming
-		Write proofs that are automatically validated
-		Code is translated into standard ML
-
-	
-
-Related Work
-	Helmert + correa quick mention
-	Ab+La and Ab+Ku provide verified input/output formats and checkers. Ab+La includes SAS+ potentially for outlook. Ab+Ku includes solver for STRIPS
-	Ab+Ku additionally provides solver
-	lpopt thesis?: tree decomp proofs
-	Otherwise not much formally verified work on grounding.
-	But many grounders.
-
-Methodology
-	Parser for problem (not verified) into AST
-	Ab+La as input format
-	Restrict input format
-		Single-typed constants + explanation
-		goal only conj (MVP)
-	Type normalization
-		Create instance where only type is "object"
-		Unique predicate names
-		generate supertype facts
-			reachable_nodes algorithm
-		generate param preconds
-		remove types
-		
-		Main theorem: equivalence of semantics
-	Formula Normalization
-		Goal already conjunction. Alternatively put goal into CNF, create dummy actions with clauses as preconditions, define dummy goal.
-		Preconditions: turn formula into CNF, then remove negative atoms (for relaxed reachability), then split across disjunctions.
-			NNF sufficient relaxed reachability -> STRIPS formulas
-		Main theorem: equivalence of semantics w.r.t. corresponding actions.
-			
-	Relaxed instance
-		just remove negative literals
-		Main theorem: reachable states are superset of OGs
-	Datalog transformation
-		rules are safe due to type-predicates.
-		If not, dummy(x) is added (MVP)
-		Main theorem: reachable states equivalent to relaxed instance
-	Datalog decomposition
-		Join/projection rules
-		normal form
-		Performance-critical issue: How to choose joins.
-		Helmert's Algorithm, Correa's Heuristic
-		[correa:] Helmert prefers atoms with many variables to join first, correa with few variables first.
-		
-		GRAPH DECOMPOSITION
-			graph decomposition definition
-			External algorithm
-			Algorithm external! No proof that algorithm ever terminates. BUT in principle, there is always a tree decomposition.
-	External datalog solver
-	Generation of grounded instance
-		Interpret datalog solution: No solution -> goal not reachable
-		Construct instance from set of reachable operators
-	To STRIPS		
-		no overlap between add and del effects!
-		Goal allowed to contain negative literals
-		if operator isn't enabled, it does NOOP.
-		Parallel plans, not necessary.
-	Piping into Ab+Lu solver
-
 Implementation + Proofs
-	Ab+La specifics
-		term: Union of variable and constant.
-			instance with only constant terms is essentially already grounded.
-		Formula atoms: either facts or Eq
-		e.g. effects are "atom formula list" in favor of "PredAtom list". Restricted to list of facts by wf, not by types
-		Either-type consts
-		wrapper classes to ensure safety (can't confuse variable and const)
-		ObjectT
-		Closed-world and Entailment/Valuation!
-	input restriction
-		Well-formed action parameters (potentially an oversight)
 	Type norm
-		Easier for me because no forall in effects
 
 		well-formed
 		of type iff in superfacts
@@ -138,18 +13,14 @@ Implementation + Proofs
 		(ObjT | map_of ents) Some iff
 		type_atoms notin/disj logic, entailment equivalence
 	Formula norm
-		goal must be conjunction (axioms originally required to compile disjunctions into), precondition -> CNF -> split operators across disjunctions. NNF sufficient for Pi+, CNF needed for Datalog.
 		
 		Operator ID organization
 		Splitting operators: semantics
 	Relaxed Reachability
-		negative literals assumed to be always true
 		
 		reachable states definition
 		reachable operators definition
 		Pi+ reachable states is subset proof
-	Datalog transform
-		We don't worry about rule safety because of type preconditions (every parameter is mentioned in preconditions). But you could also add dummy (x)
 	Datalog decomp
 	
 		
@@ -158,24 +29,4 @@ Implementation + Proofs
 		Algorithm termination proof (regardless of heuristic)
 		Algorithm produces normal form proof
 		Tree decomp join tree proof
-		tree decomp checker
-
-Results (performance)
-	obviously ass but much better than expected
-	Isabelle generates code into ML, which is less efficient (space + time) than compiled code (correa).
-	Still, same order of magnitude
-
-Outlook/Discussion
-	Allow disjunctions in goal formula!
-	support PDDL axioms
-	implement invariant synthesis to change output to SAS+
-	consider types in datalog translation (Typed Datalog exists)
-
-Conclusion
-	i habs neu implementiert
-	habs gezeigt
-	läuft halt interpretiert also nicht schnell aber läuft
-
-Glossary
-	Abbreviations
-			
+		tree decomp checker			

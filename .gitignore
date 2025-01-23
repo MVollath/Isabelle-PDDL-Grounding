@@ -1,3 +1,5 @@
 *.thy~
 *~
 *.marks
+
+*exported.sml

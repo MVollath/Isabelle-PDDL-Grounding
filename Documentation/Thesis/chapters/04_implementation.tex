@@ -1,0 +1,80 @@
+% !TeX root = ../main.tex
+\chapter{Implementation}
+\warn{\begin{itemize}
+	\item Parser for problem (not verified) into AST
+	\item Ab+La as input format
+\end{itemize}}
+\section{Datatype Representation}
+\warn{Ab+La specifics:
+\begin{itemize}
+	\item term: Union of variable and constant.
+	\item instance with only constant terms is essentially already grounded.
+	\item Formula atoms: either facts or Eq
+	\item e.g. effects are "atom formula list" in favor of "PredAtom list". Restricted to list of facts by wf, not by types
+	\item Either-type consts
+	\item wrapper classes to ensure safety (can't confuse variable and const)
+	\item objectT
+	\item Closed-world and Entailment/Valuation!
+\end{itemize}}
+\section{Input Restriction}
+\warn{\begin{itemize}
+	\item single-typed constants + explanation. What if we don't restrict this?
+	\item goal only conj (MVP)
+	\item Well-formed action parameters (potentially an oversight)
+\end{itemize}}
+\section{Normalization}
+\subsection{Type Normalization}
+\warn{\begin{itemize}
+	\item Create instance where only type is ``object''
+	\item unique predicate names
+	\item generate supertype facts
+	\item reachable nodes algorithm
+	\item generate param preconds. If action params were allowed to not be wf, then action would not have valid instantiations, thus precond could just be False instead.
+	\item remove types
+	\item easier for me because no forall in effects
+	\item Main theorem: equivalence of semantics
+\end{itemize}}
+\subsection{Formula Normalization}
+\warn{\begin{itemize}
+	\item Goal already conjunction. (axioms originally required to compile disjunctions into) Alternatively put goal into CNF, create dummy actions with clauses as preconditions, define dummy goal.
+	\item Preconditions: turn formula into CNF, then remove negative atoms (for relaxed reachability), then split across disjunctions.
+	\item Operator ID organization
+	\item NNF sufficient relaxed reachability -> STRIPS formulas. But CNF needed for datalog
+	\item Main theorem: equivalence of semantics w.r.t. corresponding actions.
+\end{itemize}}
+\section{Reachability Analysis}
+\subsection{Relaxed Task Generation}
+\warn{\begin{itemize}
+	\item Just remove negative literals
+	\item Main theorem: reachable states are superset of OGs
+\end{itemize}}
+\subsection{Datalog Generation}
+\warn{\begin{itemize}
+	\item rules are safe due to type-predicates. (every parameter is mentioned in preconditions).
+	\item If not, dummy(x) is added (MVP)
+	\item Main theorem: reachable states equivalent to relaxed instance
+\end{itemize}}
+\subsection{Datalog Rule Decomposition}
+\warn{\begin{itemize}
+	\item Join/projection rules
+	\item normal form
+	\item Performance-critical issue: How to choose joins.
+	\item Helmert's Algorithm, Correa's Heuristic
+	\item [correa:] Helmert prefers atoms with many variables to join first, correa with few variables first.
+	\item external datalog solver
+\end{itemize}}
+\subsection{Refinement: Tree Decomposition}
+\warn{\begin{itemize}
+	\item tree decomposition definition
+	\item External algorithm (?)
+	\item Algorithm external! No proof that algorithm ever terminates. BUT in principle, there is always a tree decomposition.
+\end{itemize}}
+\section{Grounded Instance Generation}
+\warn{\begin{itemize}
+	\item Interpret datalog solution: No solution -> goal not reachable
+	\item Construct instance from set of reachable operators
+	\item TO STRIPS: no overlap between add and del effects!
+	\item STRIPS: Goal allowed to contain negative literals
+	\item STRIPS: if operator isn't enabled, it does NOOP.
+	\item piping into Ab+Ku solver
+\end{itemize}}
