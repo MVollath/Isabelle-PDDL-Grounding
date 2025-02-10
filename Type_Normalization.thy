@@ -1,4 +1,4 @@
-theory PDDL_Normalization
+theory Type_Normalization
   imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
     Utils Graph_Funs String_Shenanigans AbLa_alts
 begin
