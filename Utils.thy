@@ -1,10 +1,12 @@
 theory Utils
   imports
     "Propositional_Proof_Systems.Sema"
+    "Propositional_Proof_Systems.CNF_Formulas"
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
 begin
 
 (* syntax sugar *)
+
 
 text \<open> Not using the default list_all because it makes proofs cumbersome \<close>
 abbreviation (input) list_all1 where
@@ -28,16 +30,32 @@ lemma conj_split_7:
   using assms by simp_all
 
 (* formula helpers *)
+(* consider right deep prop (A&B) \<longleftrightarrow> literal A & prop B *)
 
 fun only_conj :: "'a formula \<Rightarrow> bool" where
-  "only_conj (Atom a) \<longleftrightarrow> True" |
-  "only_conj \<bottom> \<longleftrightarrow> True" |
-  "only_conj (\<^bold>\<not> (Atom a)) \<longleftrightarrow> True" |
-  "only_conj (\<phi> \<^bold>\<and> \<psi>) \<longleftrightarrow> only_conj \<phi> \<and> only_conj \<psi>" |
+  "only_conj (Atom a) \<longleftrightarrow> True" | (* literal *)
+  "only_conj (\<^bold>\<not> (Atom a)) \<longleftrightarrow> True" | (* literal *)
+  "only_conj \<bottom> \<longleftrightarrow> True" | (* literal *)
+  "only_conj (\<^bold>\<not>\<bottom>) \<longleftrightarrow> True" | (* literal *)
+
+  "only_conj (\<phi> \<^bold>\<and> \<psi>) \<longleftrightarrow> only_conj \<phi> \<and> only_conj \<psi>" | (* conjunct *)
 
   "only_conj (\<^bold>\<not> _) \<longleftrightarrow> False" |
   "only_conj (_ \<^bold>\<or> _) \<longleftrightarrow> False" |
   "only_conj (_ \<^bold>\<rightarrow> _) \<longleftrightarrow> False"
+
+fun in_dnf :: "'a formula \<Rightarrow> bool" where
+  "in_dnf (Atom a) \<longleftrightarrow> True" | (* literal *)
+  "in_dnf (\<^bold>\<not> (Atom a)) \<longleftrightarrow> True" | (* literal *)
+  "in_dnf \<bottom> \<longleftrightarrow> True" | (* literal *)
+  "in_dnf (\<^bold>\<not>\<bottom>) \<longleftrightarrow> True" | (* literal *)
+
+  "in_dnf (\<phi> \<^bold>\<or> \<psi>) \<longleftrightarrow> in_dnf \<phi> \<and> in_dnf \<psi>" | (* disjunct *)
+  "in_dnf (\<phi> \<^bold>\<and> \<psi>) \<longleftrightarrow> only_conj \<phi> \<and> only_conj \<psi>" | (* conjunct *)
+
+  "in_dnf (\<^bold>\<not> _) \<longleftrightarrow> False" |
+  "in_dnf (_ \<^bold>\<rightarrow> _) \<longleftrightarrow> False"
+  
 
 (* random lemmas *)
 

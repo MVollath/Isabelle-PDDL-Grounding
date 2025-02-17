@@ -34,8 +34,7 @@ locale restr_domain = wf_ast_domain +
 
 definition (in ast_problem) restrict_prob :: bool where
   "restrict_prob \<equiv> restrict_dom
-    \<and> single_types (objects P)
-    \<and> only_conj (goal P)"
+    \<and> single_types (objects P)"
 
 locale restr_problem = wf_ast_problem +
   assumes restrict_prob: restrict_prob
@@ -93,7 +92,7 @@ begin
   definition detype_ents :: "('ent \<times> type) list \<Rightarrow> ('ent \<times> type) list" where
     "detype_ents params \<equiv> map detype_ent params"
 
-  fun detype_ac :: "ast_action_schema \<Rightarrow> ast_action_schema" where
+  primrec detype_ac :: "ast_action_schema \<Rightarrow> ast_action_schema" where
   "detype_ac (Action_Schema n params pre eff) =
     Action_Schema n (detype_ents params) (param_precond params \<^bold>\<and> pre) eff"
 
@@ -152,12 +151,6 @@ definition (in ast_problem) typeless_prob :: "bool" where
     typeless_dom
     \<and> (\<forall>(n, T) \<in> set (objects P). T = \<omega>)"
 
-subsection \<open>Complete Normalization\<close>
-
-definition (in ast_problem) normalized_prob :: "bool" where
-  "normalized_prob \<equiv> typeless_prob \<and> undefined"
-
-
 (* ------------------------------------- PROOFS ------------------------------------------------- *)
 subsection \<open>Type Normalization Proofs\<close>
 
@@ -195,7 +188,7 @@ sublocale restr_problem2 \<subseteq> wf_ast_problem2
 sublocale restr_problem2 \<subseteq> restr_domain2 D
   by unfold_locales
 
-text \<open> Alternate/simplified definitions\<close>
+subsection \<open> Alternate/simplified definitions\<close>
 
 lemma single_type_alt: "single_type T \<longleftrightarrow> length (primitives T) = 1"
   by (cases T; simp)
@@ -252,7 +245,7 @@ lemma (in restr_domain) restr_D: "single_types (consts D)" "list_all1 wf_action_
   using restrict_dom restrict_dom_def by auto
 
 (* just restrict_prob unfolded *)
-lemma (in restr_problem) restr_P: "single_types (objects P)" "only_conj (goal P)"
+lemma (in restr_problem) restr_P: "single_types (objects P)"
   using restrict_prob restrict_prob_def by auto
 
 lemma (in restr_problem) single_t_objs: "single_types (all_objects)"

@@ -26,6 +26,18 @@ sublocale grounded_problem \<subseteq> grounded_domain D
   using grounded_dom by (unfold_locales) simp
 
 
+lemma (in grounded_problem)
+  assumes "wf_plan_action (PlanAction n args)"
+  shows "args = []"
+  oops
+
+lemma (in grounded_problem)
+  assumes "wf_plan_action \<pi>"
+  obtains ac where
+    "ac \<in> set (actions D)"
+    "wf_plan_action (PlanAction ac [])"
+    "resolve_instantiate \<pi> = instantiate_action_schema ac []"
+  oops
 
 
 
