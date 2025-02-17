@@ -151,10 +151,19 @@ lemma g_constT:
   using objT_def degoal_dom_sel d3.constT_def
   using constT_def map_le_iff_map_add_commute objm_le_objT by auto
 
+lemma g_objT:
+  "objT = p3.objT"
+  using g_constT d3.constT_def p3.objT_def degoal_prob_sel by simp
+
 lemma g_eff_wf:
   assumes "wf_effect tyt \<epsilon>" shows "d3.wf_effect tyt \<epsilon>"
   using assms apply (cases \<epsilon>; simp)
   using ast_domain.wf_fmla_atom_alt g_fmla_wf by blast
+
+lemma g_wm_wf:
+  assumes "wf_world_model wm" shows "p3.wf_world_model wm"
+  using assms ast_problem.wf_world_model_def ast_domain.wf_fmla_atom_alt
+    degoal_prob_sel(1) g_fmla_wf g_objT by metis
 
 lemma wf_fmla_mono:
   assumes "tys \<subseteq>\<^sub>m tys'" "wf_fmla tys \<phi>"
@@ -253,10 +262,27 @@ proof -
   from c1 c2 c3 c4 c5 c6 c7 show ?thesis using d3.wf_domain_def by simp
 qed
 
+lemma degoal_prob_wf: "p3.wf_problem"
+proof -
+  note degoal_prob_sel[simp] degoal_dom_sel[simp]
+  note c1 = degoal_dom_wf
+  have c2: "distinct (map fst (objects degoal_prob) @ map fst (consts p3.D))"
+    using wf_D wf_P by simp
+  have c3: "\<forall>(n, y) \<in> set (objects degoal_prob). p3.wf_type y" by simp (* empty list *)
+  note c4 = wf_P(3)
+  have c5: "p3.wf_world_model (set (init P))" using g_wm_wf wf_P(4) by simp
+  have c6: "p3.wf_fmla p3.objT (goal degoal_prob)"
+    (* d_preds_dist not needed, since goal_pred is the first in the list *)
+    using d3.sig_def goal_pred_decl_def by auto
+  from c1 c2 c3 c4 c5 c6 show ?thesis using p3.wf_problem_def by simp
+qed
+
 end
 
+sublocale wf_ast_problem3 \<subseteq> d3: wf_ast_domain D3
+  using degoal_dom_wf wf_ast_domain.intro by simp
 
-sublocale restr_domain2 \<subseteq> d2: wf_ast_domain D2
-  using detype_dom_wf wf_ast_domain.intro by simp
+sublocale wf_ast_problem3 \<subseteq> p3: wf_ast_problem P3
+  using degoal_prob_wf wf_ast_problem.intro by simp
 
 end
