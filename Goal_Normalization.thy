@@ -207,7 +207,7 @@ qed
 
 lemma wf_fmla_to_term:
   assumes "wf_fmla tyt F"
-  shows "wf_fmla (ty_term xd tyt) ((map_formula \<circ> map_atom) term.CONST F)"
+  shows "wf_fmla (ty_term xd tyt) (map_atom_fmla term.CONST F)"
   using assms by (induction F) (simp_all add: wf_atom_to_term)
 
 lemma g_acs_wf: "(\<forall>a\<in>set (actions D3). d3.wf_action_schema a)"
@@ -284,5 +284,186 @@ sublocale wf_ast_problem3 \<subseteq> d3: wf_ast_domain D3
 
 sublocale wf_ast_problem3 \<subseteq> p3: wf_ast_problem P3
   using degoal_prob_wf wf_ast_problem.intro by simp
+
+context wf_ast_problem3 begin
+
+abbreviation "\<pi>\<^sub>g \<equiv> PAction goal_ac_name []"
+
+lemma resolve_ac_g:
+  "p3.resolve_action_schema goal_ac_name = Some (goal_ac term_goal)"
+  using goal_ac_def p3.res_aux degoal_prob_sel degoal_dom_sel by simp
+
+lemma wf_pa_g:
+  "p3.wf_plan_action \<pi>\<^sub>g"
+proof -
+  have "p3.action_params_match (goal_ac term_goal) []"
+    unfolding goal_ac_def p3.action_params_match_def by simp
+  with resolve_ac_g show ?thesis using p3.wf_plan_action_simple by fastforce
+qed
+
+term "(map_formula\<circ>map_atom) term.CONST (\<phi>::object atom formula)"
+
+lemma term_to_obj: "ac_tsubst [] [] (term.CONST x) = x"
+  unfolding ac_tsubst_def by simp
+
+(* this is more involved than I thought... *)
+lemma term_to_obj_atom:
+  shows "map_atom (ac_tsubst [] []) (map_atom term.CONST x) = x"
+proof (cases x)
+  case (predAtm p xs)
+  hence "map_atom (ac_tsubst [] []) (map_atom term.CONST x)
+    = predAtm p (map (ac_tsubst [] [] \<circ> term.CONST) xs)"
+    by simp
+  also have "... = predAtm p xs" using term_to_obj
+    by (simp add: map_idI)
+  finally show ?thesis using predAtm by simp
+qed (simp add: term_to_obj)
+
+lemma term_to_obj_fmla:
+  shows "map_atom_fmla (ac_tsubst [] []) (map_atom_fmla term.CONST F) = F"
+  by (induction F; simp add: term_to_obj_atom)
+
+lemma resinst_ac_g:
+  "p3.resolve_instantiate \<pi>\<^sub>g = Ground_Action (goal P) goal_effect"
+proof -
+  have "goal_ac term_goal \<in> set (actions D3)" using degoal_dom_sel by simp
+  hence "p3.resolve_instantiate \<pi>\<^sub>g = Ground_Action
+    (map_atom_fmla (ac_tsubst [] []) term_goal)
+    (map_ast_effect (ac_tsubst [] []) goal_effect)"
+    using goal_ac_def p3.resolve_instantiate_cond
+    by (simp add: degoal_prob_sel(1))
+  moreover have "(map_ast_effect (ac_tsubst [] []) goal_effect) = goal_effect" by simp
+    (* Very simple because there are no parameters, so nothing is actually being mapped.
+       Only the type of an empty list is changed. *)
+  moreover have "map_atom_fmla (ac_tsubst [] []) term_goal = goal P"
+    using term_to_obj_fmla by (simp add: term_goal_def)
+  ultimately show ?thesis by simp
+qed
+
+thm wf_execute   
+lemma "wf_world_model M \<Longrightarrow> wm_basic M"
+  by (meson g_wm_wf p3.wf_fmla_atom_alt p3.wf_world_model_def wm_basic_def)
+
+lemma goal_sem:
+  assumes "wf_world_model M" "M \<^sup>c\<TTurnstile>\<^sub>= goal P"
+  shows
+    "p3.plan_action_enabled \<pi>\<^sub>g M"
+    "p3.execute_plan_action \<pi>\<^sub>g M \<^sup>c\<TTurnstile>\<^sub>= goal P3"
+proof -
+  from assms resinst_ac_g wf_pa_g show "p3.plan_action_enabled \<pi>\<^sub>g M"
+    using p3.plan_action_enabled_def by simp
+
+  from assms(1) this
+  have basic: "wm_basic (p3.execute_plan_action \<pi>\<^sub>g M)"
+    using g_wm_wf p3.wf_execute p3.wf_fmla_atom_alt p3.wf_world_model_def wm_basic_def
+    by metis
+
+  from resinst_ac_g have "effect (p3.resolve_instantiate \<pi>\<^sub>g) = goal_effect"
+    by simp
+  hence "Atom (predAtm goal_pred []) \<in> p3.execute_plan_action \<pi>\<^sub>g M"
+    using p3.execute_plan_action_def by simp
+  hence "valuation (p3.execute_plan_action \<pi>\<^sub>g M) \<Turnstile> goal P3" using degoal_prob_sel(4)
+    using valuation_def by simp
+  with basic show "p3.execute_plan_action \<pi>\<^sub>g M \<^sup>c\<TTurnstile>\<^sub>= goal P3"
+    using valuation_iff_close_world by simp
+qed
+
+lemma g_obj_of_type:
+  "is_obj_of_type = p3.is_obj_of_type"
+  unfolding ast_problem.is_obj_of_type_alt ast_domain.is_of_type_def ast_domain.of_type_def
+    ast_domain.subtype_rel_def
+  using g_objT degoal_dom_sel(1) degoal_prob_sel(1) by metis
+
+(* TODO clean up *)
+lemma g_pa_wf_right:
+  assumes "wf_plan_action \<pi>"
+  shows 
+    "resolve_instantiate \<pi> = p3.resolve_instantiate \<pi> \<and> p3.wf_plan_action \<pi>"
+using assms proof (cases \<pi>)
+  case (PAction n args)
+  with assms obtain ac where 1:
+    "resolve_action_schema n = Some ac" "ac \<in> set (actions D)" "ac_name ac = n"
+    by (meson wf_pa_refs_ac)
+  hence "ac \<in> set (actions D3)" using degoal_dom_sel by simp
+  with 1 have r: "d3.resolve_action_schema n = Some ac"
+    using degoal_prob_sel by (metis p3.res_aux)
+  hence g1: "resolve_instantiate \<pi> = p3.resolve_instantiate \<pi>"
+    using degoal_prob_sel 1 PAction by simp
+
+  from 1 assms have "action_params_match ac args" by (simp add: PAction)
+  hence "p3.action_params_match ac args"
+    unfolding ast_problem.action_params_match_def
+    using g_obj_of_type by simp
+  with r have g2: "p3.wf_plan_action \<pi>" using p3.wf_plan_action_simple PAction
+    using degoal_prob_sel(1) PAction by fastforce
+
+  from g1 g2 show ?thesis by simp
+qed
+
+
+lemma g_exec_right:
+  assumes "wf_plan_action \<pi>"
+  shows "execute_plan_action \<pi> M = p3.execute_plan_action \<pi> M"
+  using assms ast_problem.execute_plan_action_def g_pa_wf_right by simp
+
+lemma g_enab_right:
+  assumes "wf_plan_action \<pi>"
+  shows "plan_action_enabled \<pi> M = p3.plan_action_enabled \<pi> M"
+  using assms g_pa_wf_right ast_problem.plan_action_enabled_def by simp
+
+lemma g_execs_right:
+  assumes "wf_world_model M" "plan_action_path M \<pi>s M'"
+  shows "p3.plan_action_path M \<pi>s M'"
+  using assms proof (induction \<pi>s arbitrary: M)
+case (Cons p ps)
+  hence 0: "plan_action_enabled p M \<and> plan_action_path (execute_plan_action p M) ps M'"
+    using plan_action_path_Cons by simp
+  with Cons have 1: "p3.plan_action_enabled p M" using g_enab_right
+    by (simp add: plan_action_path_def)
+  from wf_execute 0
+  have "wf_world_model (execute_plan_action p M)"
+    by (simp add: Cons.prems(1))
+  note Cons.IH[OF this]
+  with 0 have "p3.plan_action_path (execute_plan_action p M) ps M'" by simp
+  then show ?case
+    using "1" Cons.prems(2) g_exec_right plan_action_path_def by force
+qed simp
+
+thm plan_action_path_Cons
+
+lemma (in wf_ast_problem) valid_plan_from_Cons[simp]:
+  "valid_plan_from M (\<pi> # \<pi>s)
+    \<longleftrightarrow> valid_plan_from (execute_plan_action \<pi> M) \<pi>s \<and> plan_action_enabled \<pi> M"
+  using valid_plan_from_def by auto
+
+lemma (in wf_ast_problem) valid_plan_from_append:
+  "valid_plan_from M (\<pi>s @ [\<pi>])
+    \<longleftrightarrow> (\<exists>M'. plan_action_path M \<pi>s M' \<and> plan_action_enabled \<pi> M' \<and>
+    execute_plan_action \<pi> M' \<^sup>c\<TTurnstile>\<^sub>= goal P)"
+  using valid_plan_from_def by (induction \<pi>s arbitrary: M; simp)
+
+
+lemma valid_plan_right:
+  assumes "valid_plan \<pi>s"
+  shows "p3.valid_plan (\<pi>s @ [\<pi>\<^sub>g])"
+proof -
+
+  from assms obtain M where 1: "plan_action_path I \<pi>s M" and 2: "M \<^sup>c\<TTurnstile>\<^sub>= goal P"
+    using valid_plan_def valid_plan_from_def by auto
+  
+  from 1 have wf_m: "wf_world_model M"
+    using wf_I wf_plan_action_path by blast
+  from 1 have "p3.plan_action_path p3.I \<pi>s M"
+    using ast_problem.I_def g_execs_right degoal_prob_sel(3) wf_I by auto
+  moreover from 2 wf_m have "p3.plan_action_enabled \<pi>\<^sub>g M"
+           "p3.execute_plan_action \<pi>\<^sub>g M \<^sup>c\<TTurnstile>\<^sub>= goal P3"
+    using goal_sem by simp_all
+  ultimately show ?thesis
+    using p3.valid_plan_from_append
+    using p3.valid_plan_def by auto
+qed
+
+end
+
 
 end

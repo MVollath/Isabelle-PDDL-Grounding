@@ -857,7 +857,7 @@ subsubsection \<open> Type pred inclusion/exclusion/overlap \<close>
 
 (* \<inter>\<emptyset>\<noteq>\<notin>\<phi>*)
 
-abbreviation "map_fmla \<equiv> map_formula \<circ> map_atom"
+abbreviation "map_atom_fmla \<equiv> map_formula \<circ> map_atom"
 
 context ast_domain begin
 lemma wf_patm_neq_type_patm:
@@ -871,21 +871,21 @@ qed
 
 lemma wf_fmla_atom_neq_type_atom:
   assumes "wf_fmla_atom tyt \<phi>"
-  shows "map_fmla f \<phi> \<noteq> type_atom x t"
+  shows "map_atom_fmla f \<phi> \<noteq> type_atom x t"
   using assms apply (cases rule: wf_fmla_atom.cases[of \<phi>])
   using wf_patm_neq_type_patm by fastforce+
 
 lemma wf_fmla_atom_neq_type_atom_unatm:
   assumes "wf_fmla_atom tyt \<phi>"
-  shows "un_Atom (map_fmla f \<phi>) \<noteq> type_predatm x t"
+  shows "un_Atom (map_atom_fmla f \<phi>) \<noteq> type_predatm x t"
   using assms apply (cases rule: wf_fmla_atom.cases[of \<phi>])
   using wf_patm_neq_type_patm by fastforce+
 
 lemma wf_fmla_no_type_patms:
   assumes "wf_fmla tyt \<phi>"
-  shows "type_predatm n t \<notin> atoms (map_fmla f \<phi>)"
+  shows "type_predatm n t \<notin> atoms (map_atom_fmla f \<phi>)"
 proof -
-  have "atoms (map_fmla f \<phi>) = (map_atom f) ` (atoms \<phi>)"
+  have "atoms (map_atom_fmla f \<phi>) = (map_atom f) ` (atoms \<phi>)"
     by (simp add: formula.set_map)
   moreover have "type_predatm n t \<notin> (map_atom f) ` (atoms \<phi>)"
   using assms proof (induction \<phi>)
@@ -908,10 +908,10 @@ lemma "(\<forall>a \<in> S. f a \<notin> Y) \<longleftrightarrow> f ` S \<inter>
 
 lemma (in restr_problem) sf_disj_wf_fmla:
   assumes "wf_fmla tyt \<phi>"
-  shows "sf_substate \<inter> Atom ` atoms (map_fmla f \<phi>) = {}"
+  shows "sf_substate \<inter> Atom ` atoms (map_atom_fmla f \<phi>) = {}"
   using assms sf_typeatms wf_fmla_no_type_patms by fastforce
 
-lemma fmla_map_id: "map_fmla id \<phi> = \<phi>"
+lemma fmla_map_id: "map_atom_fmla id \<phi> = \<phi>"
   by (simp add: atom.map_id0 formula.map_id)
 
 lemma (in restr_problem) sf_disj_wf_fmla0:
@@ -920,7 +920,7 @@ lemma (in restr_problem) sf_disj_wf_fmla0:
   using assms sf_disj_wf_fmla[where f=id] fmla_map_id by metis
 
 lemma (in -) "map_ast_effect f (Effect A D) =
-  Effect (map ((map_formula \<circ> map_atom) f) A) (map ((map_formula \<circ> map_atom) f) D)"
+  Effect (map (map_atom_fmla f) A) (map (map_atom_fmla f) D)"
   by simp
 
 lemma wf_eff_no_type_atoms:
@@ -931,13 +931,13 @@ lemma wf_eff_no_type_atoms:
 proof -
   from assms have "\<forall>\<phi> \<in> set (adds \<epsilon>). wf_fmla_atom tyt \<phi>"
     using assms by (cases \<epsilon>) simp
-  hence "\<forall>\<phi> \<in> (map_fmla f) ` set (adds \<epsilon>). \<phi> \<noteq> type_atom n t"
+  hence "\<forall>\<phi> \<in> (map_atom_fmla f) ` set (adds \<epsilon>). \<phi> \<noteq> type_atom n t"
     using wf_fmla_atom_neq_type_atom by fast
   thus ?a by (cases \<epsilon>) auto
 
   from assms have "\<forall>\<phi> \<in> set (dels \<epsilon>). wf_fmla_atom tyt \<phi>"
     using assms by (cases \<epsilon>) simp
-  hence "\<forall>\<phi> \<in>(map_fmla f) ` set (dels \<epsilon>). \<phi> \<noteq> type_atom n t"
+  hence "\<forall>\<phi> \<in>(map_atom_fmla f) ` set (dels \<epsilon>). \<phi> \<noteq> type_atom n t"
     using wf_fmla_atom_neq_type_atom by fast
   thus ?d by (cases \<epsilon>) auto
 qed
@@ -951,9 +951,9 @@ lemma map_atom_preserves_istypeatm: "is_type_patm a \<longleftrightarrow> is_typ
 
 lemma map_fmla_preserves_istypeatm:
   assumes "\<forall>a \<in> atoms F. is_type_patm a"
-  shows "\<forall>a \<in> atoms (map_fmla f F). is_type_patm a"
+  shows "\<forall>a \<in> atoms (map_atom_fmla f F). is_type_patm a"
 proof -
-  have "atoms (map_fmla f F) = (map_atom f) ` (atoms F)"
+  have "atoms (map_atom_fmla f F) = (map_atom f) ` (atoms F)"
     by (simp add: formula.set_map)
   thus ?thesis using assms
     apply (induction F)
@@ -964,9 +964,9 @@ qed
 
 lemma map_fmla_preserves_nistypeatm:
   assumes "\<forall>a \<in> atoms F. \<not> is_type_patm a"
-  shows "\<forall>a \<in> atoms (map_fmla f F). \<not> is_type_patm a"
+  shows "\<forall>a \<in> atoms (map_atom_fmla f F). \<not> is_type_patm a"
 proof -
-  have "atoms (map_fmla f F) = (map_atom f) ` (atoms F)"
+  have "atoms (map_atom_fmla f F) = (map_atom f) ` (atoms F)"
     by (simp add: formula.set_map)
   thus ?thesis using assms
     apply (induction F)
@@ -976,7 +976,7 @@ proof -
 qed
 
 lemma param_pre_typeatms:
-  "\<forall> a \<in> atoms (map_fmla f (param_precond params)). \<exists>x t. a = type_predatm x t"
+  "\<forall> a \<in> atoms (map_atom_fmla f (param_precond params)). \<exists>x t. a = type_predatm x t"
 proof -
   let ?is_typatm = "\<lambda>a. (\<exists>x t. a = type_predatm x t)"
   have "\<forall> f \<in> set (map (type_atom (term.VAR v)) ts).
@@ -999,7 +999,7 @@ lemma (in ast_problem) wf_wm_no_typeatms:
 
 lemma (in ast_problem) wf_wm_disj_param_pre:
   assumes "wf_world_model wm"
-  shows "wm \<inter> Atom ` atoms (map_fmla f (param_precond params)) = {}"
+  shows "wm \<inter> Atom ` atoms (map_atom_fmla f (param_precond params)) = {}"
   using assms wf_wm_no_typeatms param_pre_typeatms by force
 
 (* for wf init, since sf and init don't overlap *)
@@ -1258,9 +1258,9 @@ lemma map_formula_bigOr: "(\<^bold>\<Or> (map (map_formula f) \<phi>s)) = map_fo
 lemma (in restr_problem2) obj_of_vartype_iff:
   assumes "tsubst (term.VAR v) = n"
   shows "is_obj_of_type n vT \<longleftrightarrow>
-    sf_substate \<^sup>c\<TTurnstile>\<^sub>= (map_formula \<circ> map_atom) tsubst (type_precond (v, vT))"
+    sf_substate \<^sup>c\<TTurnstile>\<^sub>= map_atom_fmla tsubst (type_precond (v, vT))"
 proof -
-  let ?map_subst = "(map_formula \<circ> map_atom) tsubst"
+  let ?map_subst = "map_atom_fmla tsubst"
   have 1: "map (type_atom n) (primitives vT) = map (?map_subst \<circ> type_atom (term.VAR v)) (primitives vT)"
     using assms by simp
   have 2: "\<^bold>\<Or>(map (?map_subst \<circ> (type_atom (term.VAR v))) (primitives vT))
@@ -1292,7 +1292,7 @@ lemma (in restr_problem2) obj_of_vartype_iff2:
     "params ! i = (v, vT)" "args ! i = n"
     "i < length params" "i < length args"
   shows "is_obj_of_type n vT \<longleftrightarrow>
-    sf_substate \<^sup>c\<TTurnstile>\<^sub>= (map_formula \<circ> map_atom) (ac_tsubst params args) (type_precond (v, vT))"
+    sf_substate \<^sup>c\<TTurnstile>\<^sub>= map_atom_fmla (ac_tsubst params args) (type_precond (v, vT))"
   using obj_of_vartype_iff ac_tsubst_aux[OF assms] by blast
 
 (* using this logic for the next lemma *)
@@ -1305,10 +1305,10 @@ theorem (in restr_problem2) params_match_iff_type_precond:
   defines "params \<equiv> ac_params ac"
   shows "action_params_match ac args \<longleftrightarrow>
     length params = length args \<and>
-    sf_substate \<^sup>c\<TTurnstile>\<^sub>= (map_formula \<circ> map_atom) (ac_tsubst params args) (param_precond params)"
+    sf_substate \<^sup>c\<TTurnstile>\<^sub>= map_atom_fmla (ac_tsubst params args) (param_precond params)"
 proof -
   let ?leq = "length params = length args"
-  define el_map where "el_map \<equiv> (map_formula \<circ> map_atom) (ac_tsubst params args)"
+  define el_map where "el_map \<equiv> map_atom_fmla (ac_tsubst params args)"
 
   have dis: "distinct (map fst params)" using assms wf_action_schema_alt by metis
 
@@ -1505,8 +1505,8 @@ proof -
       by (rule t_resinst)
 
     (* parameter mappings *)
-    let ?pre_map = "(map_formula \<circ> map_atom) (ac_tsubst (parameters ac) args)"
-    let ?pre_map2 = "(map_formula \<circ> map_atom) (ac_tsubst (parameters (detype_ac ac)) args)"
+    let ?pre_map = "map_atom_fmla (ac_tsubst (parameters ac) args)"
+    let ?pre_map2 = "map_atom_fmla (ac_tsubst (parameters (detype_ac ac)) args)"
     have "map fst (parameters (detype_ac ac)) = map fst (parameters ac)"
       by (cases ac; simp add: t_ents_names)
     hence premaps: "?pre_map2 = ?pre_map" using ac_tsubst_def by simp
@@ -1562,8 +1562,8 @@ proof -
       and res: "resolve_action_schema n = Some ac" by (metis t_resinst_inv)
 
     (* parameter mappings *)
-    let ?pre_map2 = "(map_formula \<circ> map_atom) (ac_tsubst (ac_params ac2) args)"
-    let ?pre_map = "(map_formula \<circ> map_atom) (ac_tsubst (ac_params ac) args)"
+    let ?pre_map2 = "map_atom_fmla (ac_tsubst (ac_params ac2) args)"
+    let ?pre_map = "map_atom_fmla (ac_tsubst (ac_params ac) args)"
     have t_param_names: "map fst (parameters ac) = map fst (parameters (detype_ac ac))"
       by (cases ac; simp add: t_ents_names)
     hence premaps: "?pre_map = ?pre_map2" using ac_tsubst_def by simp
