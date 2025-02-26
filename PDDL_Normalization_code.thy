@@ -185,4 +185,33 @@ definition "split_prob P \<equiv>
 fun original_plan_ac where
   "original_plan_ac D (PAction n args) = PAction (drop (prefix_padding D) n) args"
 
+subsection \<open> Relaxation \<close>
+
+fun remove_neg_lits :: "'a formula \<Rightarrow> 'a formula" where
+  "remove_neg_lits (Atom a) = Atom a" |
+  "remove_neg_lits (\<^bold>\<not>\<bottom>) = (\<^bold>\<not>\<bottom>)" |
+  "remove_neg_lits (Atom a \<^bold>\<and> c) = (Atom a \<^bold>\<and> remove_neg_lits c)" |
+  "remove_neg_lits (\<^bold>\<not>(Atom a) \<^bold>\<and> c) = remove_neg_lits c"
+
+fun relax_eff :: "'a ast_effect \<Rightarrow> 'a ast_effect" where
+  "relax_eff (Effect a b) = Effect a []"
+
+fun relax_ac :: "ast_action_schema \<Rightarrow> ast_action_schema" where
+  "relax_ac (Action_Schema n params pre eff) =
+    Action_Schema n params (remove_neg_lits pre) (relax_eff eff)"
+
+definition "relax_dom D \<equiv>
+  Domain
+    (types D)
+    (predicates D)
+    (consts D)
+    (map relax_ac (actions D))"
+
+definition "relax_prob P \<equiv>
+  Problem
+    (relax_dom (domain P))
+    (objects P)
+    (init P)
+    (remove_neg_lits (goal P))"
+
 end

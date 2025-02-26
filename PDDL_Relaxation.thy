@@ -3,9 +3,18 @@ imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
     Formula_Normalization Utils AbLa_alts
 begin
 
+(* This is only defined for pure conjunctive clauses. *)
+fun remove_neg_lits :: "'a formula \<Rightarrow> 'a formula" where
+  "remove_neg_lits (\<^bold>\<not>\<bottom>) = (\<^bold>\<not>\<bottom>)" |
+  "remove_neg_lits (Atom a \<^bold>\<and> c) = (Atom a \<^bold>\<and> remove_neg_lits c)" |
+  "remove_neg_lits (\<^bold>\<not>(Atom a) \<^bold>\<and> c) = remove_neg_lits c"
 
+fun relax_eff :: "'a ast_effect \<Rightarrow> 'a ast_effect" where
+  "relax_eff (Effect a b) = Effect a []"
 
-
+fun relax_ac :: "ast_action_schema \<Rightarrow> ast_action_schema" where
+  "relax_ac (Action_Schema n params pre eff) =
+    Action_Schema n params (remove_neg_lits pre) (relax_eff eff)"
 
 
 

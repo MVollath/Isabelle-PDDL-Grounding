@@ -251,5 +251,11 @@ value "my_plan_2_from_3"
 value "execute_plan_c my_prob_degoaled my_plan_2_from_3 (set (init my_prob_degoaled))"
 lemma "execute_plan_c my_prob_degoaled my_plan_2_from_3 (set (init my_prob_degoaled)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> goal my_prob_degoaled" by eval
 
+(* PDDL Relaxation *)
+(* Doesn't do anything yet as the running example doesn't have any negations in preconditions yet. *)
+definition "my_dom_relaxed \<equiv> relax_dom my_dom_split"
+definition "my_prob_relaxed \<equiv> relax_prob my_prob_split"
+value my_prob_relaxed (* Important *)
+
 
 end
