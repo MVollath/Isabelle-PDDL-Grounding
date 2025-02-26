@@ -1,6 +1,6 @@
 theory PDDL_Normalization_code
   imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    Graph_Funs String_Shenanigans
+    Graph_Funs String_Shenanigans DNF
 begin
 text \<open>Check if a formula consists of only (nested) conjunctions of literals.\<close>
 fun only_conj :: "'a formula \<Rightarrow> bool" where
@@ -106,9 +106,83 @@ definition typeless_dom :: "ast_domain \<Rightarrow> bool" where
 definition typeless_prob :: "ast_problem \<Rightarrow> bool" where
   "typeless_prob P = undefined"
 
-subsection \<open>Complete Normalization\<close>
+subsection \<open>Goal Normalization\<close>
 
-definition normalized_prob :: "ast_problem \<Rightarrow> bool" where
-  "normalized_prob P \<equiv> typeless_prob P \<and> undefined"
+definition goal_pred :: "ast_domain \<Rightarrow> predicate" where
+  "goal_pred D \<equiv> Pred (make_unique (pred_names D) ''Goal'')"
+definition "goal_pred_decl D \<equiv> PredDecl (goal_pred D) []"
+abbreviation "ac_names D \<equiv> map ast_action_schema.name (actions D)"
+abbreviation "goal_ac_name D \<equiv> make_unique (ac_names D) ''Goal''"
+abbreviation "goal_effect D \<equiv> Effect [Atom (predAtm (goal_pred D) [])] []"
+
+definition goal_ac :: "ast_domain \<Rightarrow> term atom formula \<Rightarrow> ast_action_schema" where
+  "goal_ac D g \<equiv> Action_Schema (goal_ac_name D) [] g (goal_effect D)"
+
+definition "term_goal P \<equiv> (map_formula\<circ>map_atom) term.CONST (goal P)"
+definition "degoal_dom P \<equiv>
+    let D = domain P in
+    Domain
+      (types D)
+      ((goal_pred_decl D) # predicates D)
+      (objects P @ consts D)
+      (goal_ac D (term_goal P) # actions D)"
+  
+definition "degoal_prob P \<equiv>
+    let D = domain P in
+    Problem
+      (degoal_dom P)
+      []
+      (init P)
+      (Atom (predAtm (goal_pred D) []))"
+
+abbreviation "\<pi>\<^sub>g P \<equiv> PAction (goal_ac_name (domain P)) []"
+
+subsection "Precondition Normalization"
+
+(*
+This part helps ensure that names of the split actions are unique.
+This part calculates the DNF for every precondition, only to then discard them again,
+before they are later recalculated... This should probably be cached. *)
+definition "n_clauses ac \<equiv> length (dnf_list (ast_action_schema.precondition ac))"
+definition "max_n_clauses D \<equiv> Max (set (map n_clauses (actions D)))"
+definition "prefix_padding D \<equiv> max_length (distinct_strings (max_n_clauses D)) + 1"
+
+(* note that this isn't completely correct yet; if actions are named "A" and "A_", the results aren't unique *)
+fun set_n_pre :: " ast_action_schema \<Rightarrow> string \<Rightarrow> term atom formula \<Rightarrow> ast_action_schema" where
+  "set_n_pre (Action_Schema _ params _ eff) n pre
+  = Action_Schema n params pre eff"
+
+
+definition "split_ac_names D ac n \<equiv>
+  map (\<lambda>prefix. pad (prefix_padding D) prefix @ ast_action_schema.name ac) (distinct_strings n)"
+
+
+fun split_ac :: "ast_domain \<Rightarrow> ast_action_schema \<Rightarrow> ast_action_schema list" where
+  "split_ac D ac =
+    (let clauses = dnf_list (ast_action_schema.precondition ac) in
+    map2 (set_n_pre ac) (split_ac_names D ac (length clauses)) clauses)"
+
+definition "split_acs D \<equiv> concat (map (split_ac D) (actions D))"
+
+definition "split_dom D \<equiv>
+  Domain
+    (types D)
+    (predicates D)
+    (consts D)
+    (split_acs D)"
+
+definition "split_prob P \<equiv>
+  Problem
+    (split_dom (domain P))
+    (objects P)
+    (init P)
+    (goal P)"
+
+
+(* it's important to be able to convert a plan for the output problem into a plan for the input problem.
+  The other direction is probably (hopefully?) not important. *)
+
+fun original_plan_ac where
+  "original_plan_ac D (PAction n args) = PAction (drop (prefix_padding D) n) args"
 
 end

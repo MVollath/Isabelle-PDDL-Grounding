@@ -176,13 +176,14 @@ value "supertype_facts_for my_domain (my_objs ! 1)"
 value "type_precond my_domain (Var ''into'', Either [''Car'', ''Train''])"
 value "detype_ac my_domain op_load"
 value "detype_preds my_preds"
-value "detype_dom my_domain"
 lemma "wf_domain_c (detype_dom my_domain)" by eval
-value "detype_prob my_problem"
 lemma "wf_problem_c (detype_prob my_problem)" by eval
 
 definition "my_dom_detyped \<equiv> detype_dom my_domain"
 definition "my_prob_detyped \<equiv> detype_prob my_problem"
+value "my_dom_detyped"
+value "my_prob_detyped" (* Important *)
+
 
 value "plan_action_enabled_c my_prob_detyped 
   (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']) (set (init my_prob_detyped))"
@@ -190,8 +191,65 @@ value "execute_plan_action_c my_prob_detyped
   (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D''])
   (set (init my_prob_detyped))"
 value "execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped))"
-lemma "execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> my_goal" by eval
+lemma "execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> goal my_prob_detyped" by eval
 lemma "valid_plan_c my_prob_detyped my_plan" by eval
+
+(* Goal normalization *)
+definition "my_dom_degoaled \<equiv> degoal_dom my_prob_detyped"
+definition "my_prob_degoaled \<equiv> degoal_prob my_prob_detyped"
+value "my_prob_degoaled" (* Important *)
+definition "my_plan_2 \<equiv> my_plan @ [\<pi>\<^sub>g my_prob_detyped]"
+value my_plan_2
+value "execute_plan_c my_prob_degoaled my_plan_2 (set (init my_prob_degoaled))"
+lemma "execute_plan_c my_prob_degoaled my_plan_2 (set (init my_prob_degoaled)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> goal my_prob_degoaled" by eval
+
+(* Precondition normalization *)
+
+value "prefix_padding my_dom_degoaled"
+
+value "split_ac_names my_dom_degoaled op_drive 5"
+value "split_ac my_dom_degoaled op_drive"
+value "split_acs my_dom_degoaled"
+definition "my_dom_split \<equiv> split_dom my_dom_degoaled"
+definition "my_prob_split \<equiv> split_prob my_prob_degoaled"
+value "my_dom_split"
+value "my_prob_split" (* Important *)
+
+definition "my_plan_3 \<equiv> [
+  PAction ''0_drive'' [Obj ''c1'', Obj ''A'', Obj ''D''],
+  PAction ''0_drive'' [Obj ''c1'', Obj ''D'', Obj ''C''],
+  PAction ''0_load'' [Obj ''p1'', Obj ''C'', Obj ''c1''],
+  PAction ''0_drive'' [Obj ''c1'', Obj ''C'', Obj ''D''],
+  PAction ''0_unload'' [Obj ''p1'', Obj ''c1'', Obj ''D''],  
+  PAction ''0_choochoo'' [Obj ''t'', Obj ''E'', Obj ''D''],
+  PAction ''0_load'' [Obj ''p1'', Obj ''D'', Obj ''t''],  
+  PAction ''0_choochoo'' [Obj ''t'', Obj ''D'', Obj ''E''],
+  PAction ''0_unload'' [Obj ''p1'', Obj ''t'', Obj ''E''],
+
+  PAction ''0_drive'' [Obj ''c3'', Obj ''G'', Obj ''F''],
+  PAction ''0_load'' [Obj ''p2'', Obj ''F'', Obj ''c3''],
+  PAction ''0_drive'' [Obj ''c3'', Obj ''F'', Obj ''E''],
+  PAction ''0_unload'' [Obj ''p2'', Obj ''c3'', Obj ''E''],
+
+  PAction ''0_load'' [Obj ''p1'', Obj ''E'', Obj ''c3''],
+  PAction ''0_drive'' [Obj ''c3'', Obj ''E'', Obj ''G''],
+  PAction ''0_unload'' [Obj ''p1'', Obj ''c3'', Obj ''G''],
+
+  PAction ''0_choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
+  PAction ''0_drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G''],
+
+  PAction ''0_Goal_____'' []
+]"
+
+(* execute_plan_c does not check for enabledness, btw *)
+value "execute_plan_c my_prob_split my_plan_3 (set (init my_prob_split))"
+lemma "execute_plan_c my_prob_split my_plan_3 (set (init my_prob_split)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> goal my_prob_split" by eval
+
+definition "my_plan_2_from_3 \<equiv> map (original_plan_ac my_dom_degoaled) my_plan_3"
+value "my_plan_2_from_3"
+
+value "execute_plan_c my_prob_degoaled my_plan_2_from_3 (set (init my_prob_degoaled))"
+lemma "execute_plan_c my_prob_degoaled my_plan_2_from_3 (set (init my_prob_degoaled)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> goal my_prob_degoaled" by eval
 
 
 end

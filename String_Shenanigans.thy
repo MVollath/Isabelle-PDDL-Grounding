@@ -3,7 +3,7 @@ imports Main "Show.Show_Instances"
 begin
 
 fun max_length :: "'a list list \<Rightarrow> nat" where
-  "max_length [] = 0" | (* yeah, yeah, technically it should be -1 or None or something *)
+  "max_length [] = 0" | (* yeah, yeah, technically it should be -1 or None/undefined or something *)
   "max_length (xs # xss) = max (length xs) (max_length xss)"
 
 lemma max_length_correct: "\<forall>s \<in> set ss. length s \<le> max_length ss"
@@ -23,6 +23,9 @@ lemma dist_prefix: "distinct xs \<Longrightarrow> distinct (map ((@) (safe_prefi
 
 definition pad :: "nat \<Rightarrow> string \<Rightarrow> string" where
   "pad n s \<equiv> s @ replicate (n - length s) (CHR ''_'')"
+
+definition pad_l :: "nat \<Rightarrow> string \<Rightarrow> string" where
+  "pad_l n s \<equiv> replicate (n - length s) (CHR ''_'') @ s"
 
 lemma pad_length:
   "n \<ge> length s \<Longrightarrow> length (pad n s) = n"
@@ -60,6 +63,8 @@ fun nat_upto :: "nat \<Rightarrow> nat list" where
   "nat_upto (Suc n) = Suc n # nat_upto n"
 
 definition "distinct_strings n \<equiv> map show (case n of 0 \<Rightarrow> [] | Suc m \<Rightarrow> nat_upto m)"
+
+
 
 
 lemma dist_str_props:

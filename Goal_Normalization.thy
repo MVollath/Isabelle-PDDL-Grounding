@@ -69,6 +69,15 @@ lemma degoal_prob_sel:
   using degoal_prob_def by simp_all
 end
 
+subsection \<open>Output format\<close>
+
+context ast_problem3 begin
+
+lemmas goal_format = degoal_prob_sel(4) degoal_dom_sel(1)
+
+
+end
+
 subsection \<open>Well-Formedness\<close>
 
 context wf_ast_problem3 begin
@@ -125,6 +134,8 @@ proof -
     using sig_Some degoal_dom_sel by simp
   thus ?thesis using pred_resolve g_preds_dist degoal_dom_sel d3.sig_def by metis
 qed
+
+term ast_domain.ac_tsubst
 
 lemma g_fmla_wf:
   assumes "wf_fmla tyt \<phi>" shows "d3.wf_fmla tyt \<phi>"
@@ -462,6 +473,129 @@ proof -
     using p3.valid_plan_from_append
     using p3.valid_plan_def by auto
 qed
+
+(* ------------- left direction ------------- *)
+
+lemma fixes x :: nat assumes "even x" obtains n where "n+n = x"
+proof -
+  from assms obtain n where "n+n = x"
+    by (metis add_self_div_2 div_plus_div_distrib_dvd_right)
+  thus ?thesis ..
+qed
+
+lemma g_ac_split: "ac \<in> set (actions D3) \<longleftrightarrow> ac \<in> set (actions D) \<or> ac = goal_ac term_goal"
+  using degoal_dom_sel by auto
+
+lemma (in wf_ast_problem) wf_plan_action_elimd:
+  "wf_plan_action (PAction n args)
+  \<longleftrightarrow> (\<exists>ac. resolve_action_schema n = Some ac \<and>
+    action_params_match ac args)"
+  using wf_plan_action_simple case_optionE by force
+
+thm res_aux
+
+lemma g_wf_pa_split:
+  "p3.wf_plan_action \<pi> \<longleftrightarrow> wf_plan_action \<pi> \<or> \<pi> = \<pi>\<^sub>g"
+proof (cases \<pi>)
+  case (PAction n args)
+  note wf_plan_action_elimd
+  have "p3.wf_plan_action (PAction n args) \<longleftrightarrow>
+    (\<exists>ac. p3.resolve_action_schema n = Some ac \<and>
+    p3.action_params_match ac args)" using p3.wf_plan_action_elimd by simp
+  also have "... \<longleftrightarrow> (\<exists>ac. ac \<in> set (actions D3) \<and> ac_name ac = n \<and>
+    p3.action_params_match ac args)" using p3.res_aux
+    by (simp add: degoal_prob_sel(1))
+  also have "... \<longleftrightarrow> (\<exists>ac. (ac \<in> set (actions D) \<or> ac = goal_ac term_goal)
+    \<and> ac_name ac = n \<and> p3.action_params_match ac args)" using g_ac_split by simp
+  also have "... \<longleftrightarrow> (\<exists>ac. (ac \<in> set (actions D) \<and> ac_name ac = n \<and> action_params_match ac args))
+    \<or> (\<exists>ac. ac = goal_ac term_goal \<and> ac_name ac = n \<and> p3.action_params_match ac args)"
+    unfolding ast_problem.action_params_match_def
+    using g_obj_of_type by auto
+  also have 2: "... \<longleftrightarrow> wf_plan_action \<pi> \<or> (\<exists>ac. ac = goal_ac term_goal \<and> ac_name ac = n \<and> p3.action_params_match ac args)"
+    using wf_plan_action_elimd res_aux PAction by simp
+  note a = calculation
+
+  {
+    fix ac
+    assume 1: "ac = goal_ac term_goal \<and> ac_name ac = n \<and> p3.action_params_match ac args"
+    hence "n = goal_ac_name" 
+      using p3.res_aux resolve_ac_g by auto
+    moreover from 1 have "args = []" unfolding goal_ac_def p3.action_params_match_def by auto
+    ultimately have "PAction n args = \<pi>\<^sub>g" by simp
+  }
+  with a show ?thesis
+    using PAction 2 wf_pa_g by force
+qed
+
+thm entail_adds_irrelevant
+
+lemma (in wf_ast_problem) wf_res_inst:
+  assumes "wf_plan_action \<pi>"
+  shows "wf_ground_action (resolve_instantiate \<pi>)"
+proof (cases \<pi>)
+  case [simp]: (PAction n args)
+  from assms obtain ac where "resolve_action_schema n = Some ac"
+    "action_params_match ac args"
+    using wf_plan_action_elimd by auto
+  moreover from this have "wf_action_schema ac" using res_aux wf_D(7) by simp
+  ultimately show ?thesis using wf_instantiate_action_schema by simp
+qed
+
+lemma
+  "instantiate_action_schema = p3.instantiate_action_schema"
+  by simp
+
+thm wf_pa_refs_ac
+
+lemma wf_pa_same_ac:
+  assumes "wf_plan_action (PAction n args)"
+  shows "resolve_action_schema n = d3.resolve_action_schema n"
+proof -
+  from assms obtain ac where "resolve_action_schema n = Some ac \<and> ac \<in> set (actions D) \<and> ac_name ac = n"
+    using wf_pa_refs_ac by metis
+  moreover then have "ac \<in> set (actions D3)" using degoal_dom_sel by simp
+  ultimately show ?thesis using p3.res_aux degoal_prob_sel(1) by metis
+qed
+
+lemma
+  assumes "\<not>M \<^sup>c\<TTurnstile>\<^sub>= goal P3" "wf_plan_action \<pi>"
+  shows "\<not>(execute_plan_action \<pi> M)\<^sup>c\<TTurnstile>\<^sub>= goal P3"
+proof -
+  have "make_unique pred_names ''Goal'' \<notin> set pred_names"
+    using made_unique by blast
+  hence "make_unique pred_names ''Goal'' \<notin> predicate.name ` (pred ` set (predicates D))"
+    by auto
+  hence "goal_pred \<notin> pred ` set (predicates D)"
+    unfolding goal_pred_def using pred_stack by blast
+  note wf_instantiate_action_schema
+  from assms(2) have "wf_ground_action (p3.resolve_instantiate \<pi>)"
+    using wf_res_inst g_pa_wf_right by simp
+  hence "wf_effect objT (effect (p3.resolve_instantiate \<pi>))"
+    by (simp add: wf_ground_action_alt)
+  (* formula logic, irrelevants, ... *)
+
+
+lemma "\<not>p3.I \<^sup>c\<TTurnstile>\<^sub>= goal P3" oops
+
+lemma
+  assumes "\<pi>\<^sub>g \<notin> set (\<pi>s)"
+  shows "\<not>p3.valid_plan \<pi>s"
+  oops
+
+lemma "x \<in> set xs \<Longrightarrow> (\<exists>ys zs. x \<notin> set ys \<and> ys @ x # zs = xs)"
+  using split_list_first by force
+
+lemma
+  assumes "\<pi>\<^sub>g \<notin> set \<pi>s" "p3.plan_action_path M \<pi>s M'"
+  shows "plan_action_path M \<pi>s M'"
+  oops
+
+lemma valid_plan_left:
+  assumes "p3.valid_plan \<pi>s'"
+  obtains \<pi>s
+  where "valid_plan \<pi>s"
+  oops
+
 
 end
 
