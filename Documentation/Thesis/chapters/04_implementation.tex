@@ -18,11 +18,15 @@
 \end{itemize}}
 \section{Input Restriction}
 \warn{\begin{itemize}
-	\item single-typed constants + explanation. What if we don't restrict this?
-	\item goal only conj (MVP)
-	\item Well-formed action parameters (potentially an oversight)
+	\item single-typed constants + explanation. What if we don't restrict this --> example of what would be necessary to still normalize the types
+	\item Well-formed action parameter types (potentially an oversight). Technically not necessary: Actions and thus their preconds/effects have to be wf. So if a param isn't wf, then the precond and effect do not reference that parameter. There's probably a way to leverage that, but why bother.
 \end{itemize}}
 \section{Normalization}
+\warn{\begin{itemize}
+	\item The following normalizations can be applied independently of one another, but it is important that precondition normalization is applied last, since type normalization and goal normalization respectively modify preconditions or add actions alltogether.
+	\item each normalization step preserves some properties of the input problem (input lemmas \todo{think of a name}) and modifies it to create an output with desired properties.
+	\item For each one: prerequisites? output props, kept input props, semantics
+\end{itemize}}
 \subsection{Type Normalization}
 \warn{\begin{itemize}
 	\item Create instance where only type is ``object''
@@ -34,19 +38,32 @@
 	\item easier for me because no forall in effects
 	\item Main theorem: equivalence of semantics
 \end{itemize}}
-\subsection{Formula Normalization}
+\subsection{Goal Normalization}
 \warn{\begin{itemize}
-	\item Goal already conjunction. (axioms originally required to compile disjunctions into) Alternatively put goal into CNF, create dummy actions with clauses as preconditions, define dummy goal.
-	\item Preconditions: turn formula into CNF, then remove negative atoms (for relaxed reachability), then split across disjunctions.
+	\item Originally, axioms are required to manage disjunctions, so this alternative method is used.
+	\item This could be part of formula normalization, but this method was simply easier.
+	\item The goal is functionally replaced with a new dummy action
+	\item New goal predicate. No parameters -> true binary variable
+	\item Goal moved into precondition of new goal action that has no parameters. The effect is simply setting the goal variable to true.
+	\item The new goal is simply only the goal variable.
+\end{itemize}}
+\subsection{Precondition Normalization}
+\warn{\begin{itemize}
+	\item Turn each formula into DNF, then split across disjunctions
 	\item Operator ID organization
-	\item NNF sufficient relaxed reachability -> STRIPS formulas. But CNF needed for datalog
 	\item Main theorem: equivalence of semantics w.r.t. corresponding actions.
 \end{itemize}}
+
 \section{Reachability Analysis}
 \subsection{Relaxed Task Generation}
 \warn{\begin{itemize}
-	\item Just remove negative literals
+	\item requirement: preconditions + goal must be pure conjunctions
+	\item resulting preconditions (and goal) must really be relaxed: ENTAILMENT
+	\item Just remove negative literals in preconditions (and goal)
+	\item Mention the issue with STRIPS formulas: Not compatible with Datalog, also difficult to find "weaker" formula.
+	\item \todo{Find term for a modification of a formula that is relaxed, i.e. for every world model, sat OG ==> sat new.}
 	\item Main theorem: reachable states are superset of OGs
+	
 \end{itemize}}
 \subsection{Datalog Generation}
 \warn{\begin{itemize}

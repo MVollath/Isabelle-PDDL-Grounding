@@ -142,7 +142,7 @@ subsection "Precondition Normalization"
 (*
 This part helps ensure that names of the split actions are unique.
 This part calculates the DNF for every precondition, only to then discard them again,
-before they are later recalculated... This should probably be cached. *)
+before they are later recalculated... TODO This should probably be cached using Let. *)
 definition "n_clauses ac \<equiv> length (dnf_list (ast_action_schema.precondition ac))"
 definition "max_n_clauses D \<equiv> Max (set (map n_clauses (actions D)))"
 definition "prefix_padding D \<equiv> max_length (distinct_strings (max_n_clauses D)) + 1"

@@ -1,5 +1,8 @@
-theory Running_Example
-  imports PDDL_Normalization_code AbLa_Code Testing_Hacks
+theory Running_Example_wip
+  imports Main
+    "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"
+    PDDL_Checker_Utils
+    Type_Normalization
 begin
 
 subsection \<open> Problem Description \<close>
@@ -71,10 +74,11 @@ definition "op_unload \<equiv> Action_Schema ''unload''
   (Effect
     [Atom (predAtm (Pred ''at'') [term.VAR (Var ''what''), term.VAR (Var ''where'')])]
     [Atom (predAtm (Pred ''in'') [term.VAR (Var ''what''), term.VAR (Var ''from'')])])"
+(* btw, this is considered well-formed as long as x is not used in precondition or effects *)
 definition "op_broken \<equiv> Action_Schema ''broken''
   [(Var ''x'', Either [''n'existe pas''])]
   \<bottom>
-  (Effect [] [])" (* considered well-formed as long as x is not used in any formulas *)
+  (Effect [] [])"
 (* This operator is only there to demonstrate relaxation of action preconditions, since I couldn't think of anything
   better that would make use of negative preconditions.*)
 definition "op_build_tracks \<equiv> Action_Schema ''lay_tracks''
@@ -88,8 +92,6 @@ definition "my_actions \<equiv> [op_drive, op_choochoo, op_load, op_unload, op_b
 
 definition "my_domain \<equiv> Domain my_types my_preds my_consts my_actions"
 value "my_domain"
-(*value "ast_domain.wf_domain my_domain"*)
-
 
 (* batmobile because why not *)
 definition "my_objs \<equiv> [
@@ -124,11 +126,8 @@ definition "my_goal \<equiv>
 
 definition "my_problem \<equiv> Problem my_domain my_objs my_init my_goal"
 
-(* ---------------------- interpretation setup ------------------------- *)
-(* TODO *)
-
-lemma "wf_domain_c my_domain" by eval
-lemma "wf_problem_c my_problem" by eval
+lemma "wf_domain_x my_domain" by eval
+lemma "wf_problem_x my_problem" by eval
 
 subsection \<open> Execution \<close>
 
@@ -156,27 +155,28 @@ definition "my_plan \<equiv> [
   PAction ''drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G'']
 ]" (* Just taking the batmobile for a spin at the end, for fun. *)
 
-value "plan_action_enabled_c my_problem 
+value "enab_exec_x my_problem
   (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']) (set my_init)"
-value "execute_plan_action_c my_problem
-  (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D''])
-  (set my_init)"
-value "execute_plan_c my_problem my_plan (set my_init)"
-lemma "execute_plan_c my_problem my_plan (set my_init) \<^sup>c\<TTurnstile>\<^sub>\<equiv> my_goal" by eval
-lemma "valid_plan_c my_problem my_plan" by eval
 
-definition
-  "showvals f xs \<equiv> map (\<lambda>x. (x, f x)) xs"
+value "valid_plan_x my_problem my_plan"
+lemma "valid_plan_x my_problem my_plan = Inr()" by eval
+
 
 subsection \<open> Type normalization \<close>
 
+value "of_type_x my_domain (Either []) (Either [])"
+
 (* Type system shenanigans *)
-value "of_type_c my_domain (Either []) (Either [])"
-value "of_type_c my_domain (Either []) (Either [''Car'', ''FOO''])"
-value "of_type_c my_domain (Either [''FOO'', ''BONK'']) (Either [''BAR'', ''FOO''])"
-value "of_type_c my_domain (Either [''R'']) (Either [''object''])"
-value "is_of_type_c my_domain (objT_c my_problem)
-  (Obj ''c1'') (Either [''Car'', ''FOO''])"
+value "of_type_x my_domain (Either []) (Either [])"
+value "of_type_x my_domain (Either []) (Either [''FOO''])" (* even though FOO doesn't exist *)
+value "of_type_x my_domain (Either [''FOO'', ''BAR'']) (Either [''BAR'', ''FOO''])" (* even though both don't exist *)
+value "of_type_x my_domain (Either [''R'']) (Either [''object''])"
+
+declare ast_domain.constT_def [code]
+declare ast_problem.objT_def[code]
+
+value "ast_domain.is_of_type' (ast_problem.objT my_problem)
+  (ast_domain.STG my_domain) (Obj ''c1'') (Either [''Car'', ''FOO''])" (* even though FOO doesn't exist *)
 
 (* type normalization testing *)
 value "showvals (reachable_nodes my_types) my_type_names"

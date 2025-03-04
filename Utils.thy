@@ -5,6 +5,14 @@ theory Utils
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
 begin
 
+(* for testing *)
+definition
+  "showvals f xs \<equiv> map (\<lambda>x. (x, f x)) xs"
+
+fun showsteps :: "('a \<Rightarrow> 'b \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> 'b list \<Rightarrow> 'a list" where
+  "showsteps f i [] = [i]" |
+  "showsteps f i (x # xs) = i # showsteps f (f i x) xs"
+
 (* syntax sugar *)
 
 
