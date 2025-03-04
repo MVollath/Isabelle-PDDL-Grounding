@@ -20,6 +20,14 @@ text \<open> Not using the default list_all because it makes proofs cumbersome \
 abbreviation (input) list_all1 where
   "list_all1 P xs \<equiv> \<forall>x \<in> set xs. P x"
 
+(* lists *)
+
+fun sublist_until :: "'a list \<Rightarrow> 'a \<Rightarrow> 'a list" where
+  "sublist_until [] a = []" |
+  "sublist_until (x # xs) a =
+    (if x = a then [] else x # sublist_until xs a)"
+
+
 (* rule rewriting *)
 
 lemma conj_split_4:

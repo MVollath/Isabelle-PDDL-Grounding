@@ -37,8 +37,15 @@ context ast_problem begin
       []
       (init P)
       (Atom (predAtm goal_pred []))"
+end
+
+context ast_domain begin
+
+abbreviation "\<pi>\<^sub>g \<equiv> PAction goal_ac_name []"
+abbreviation "restore_plan_degoal \<pi>s \<equiv> sublist_until \<pi>s \<pi>\<^sub>g"
 
 end
+
 
 abbreviation (in ast_problem) (input) "D3 \<equiv> degoal_dom"
 abbreviation (in ast_problem) (input) "P3 \<equiv> degoal_prob"
@@ -297,8 +304,6 @@ sublocale wf_ast_problem3 \<subseteq> p3: wf_ast_problem P3
   using degoal_prob_wf wf_ast_problem.intro by simp
 
 context wf_ast_problem3 begin
-
-abbreviation "\<pi>\<^sub>g \<equiv> PAction goal_ac_name []"
 
 lemma resolve_ac_g:
   "p3.resolve_action_schema goal_ac_name = Some (goal_ac term_goal)"
@@ -573,7 +578,7 @@ proof -
   hence "wf_effect objT (effect (p3.resolve_instantiate \<pi>))"
     by (simp add: wf_ground_action_alt)
   (* formula logic, irrelevants, ... *)
-
+  oops
 
 lemma "\<not>p3.I \<^sup>c\<TTurnstile>\<^sub>= goal P3" oops
 
@@ -599,5 +604,15 @@ lemma valid_plan_left:
 
 end
 
+subsection \<open> Code Setup \<close>
+
+lemmas goal_norm_code =
+  ast_domain.goal_pred_def
+  ast_domain.goal_pred_decl_def
+  ast_domain.goal_ac_def
+  ast_problem.term_goal_def
+  ast_problem.degoal_dom_def
+  ast_problem.degoal_prob_def
+declare goal_norm_code[code]
 
 end

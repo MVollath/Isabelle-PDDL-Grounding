@@ -10,13 +10,13 @@ thm Max_insert
 term  finite
 thm card_eq_0_iff
 
-lemma "card xs \<noteq> 0 \<Longrightarrow> Max (insert x xs) = max x (Max xs)"
+(*lemma "card xs \<noteq> 0 \<Longrightarrow> Max (insert x xs) = max x (Max xs)"
   by (metis Max_insert card.infinite card_0_eq)
-  by (simp add: card_eq_0_iff)
+  by (simp add: card_eq_0_iff)*)
 
-lemma "length xss > 0 \<Longrightarrow> max_length xss = Max (set (map length xss))"
+(*lemma "length xss > 0 \<Longrightarrow> max_length xss = Max (set (map length xss))"
   apply (induction xss) apply simp
-  using Max_insert card_eq_0_iff card_0_eq tr
+  using Max_insert card_eq_0_iff card_0_eq *)
 
 lemma max_length_correct: "\<forall>s \<in> set ss. length s \<le> max_length ss"
   by (induction ss) auto

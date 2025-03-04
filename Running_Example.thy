@@ -1,5 +1,9 @@
 theory Running_Example
-  imports PDDL_Normalization_code AbLa_Code Testing_Hacks
+  imports Main
+    "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"
+    PDDL_Checker_Utils
+    Type_Normalization Goal_Normalization Precondition_Normalization
+    PDDL_Relaxation
 begin
 
 subsection \<open> Problem Description \<close>
@@ -71,10 +75,11 @@ definition "op_unload \<equiv> Action_Schema ''unload''
   (Effect
     [Atom (predAtm (Pred ''at'') [term.VAR (Var ''what''), term.VAR (Var ''where'')])]
     [Atom (predAtm (Pred ''in'') [term.VAR (Var ''what''), term.VAR (Var ''from'')])])"
+(* btw, this is considered well-formed as long as x is not used in precondition or effects *)
 definition "op_broken \<equiv> Action_Schema ''broken''
   [(Var ''x'', Either [''n'existe pas''])]
   \<bottom>
-  (Effect [] [])" (* considered well-formed as long as x is not used in any formulas *)
+  (Effect [] [])"
 (* This operator is only there to demonstrate relaxation of action preconditions, since I couldn't think of anything
   better that would make use of negative preconditions.*)
 definition "op_build_tracks \<equiv> Action_Schema ''lay_tracks''
@@ -88,8 +93,6 @@ definition "my_actions \<equiv> [op_drive, op_choochoo, op_load, op_unload, op_b
 
 definition "my_domain \<equiv> Domain my_types my_preds my_consts my_actions"
 value "my_domain"
-(*value "ast_domain.wf_domain my_domain"*)
-
 
 (* batmobile because why not *)
 definition "my_objs \<equiv> [
@@ -124,11 +127,8 @@ definition "my_goal \<equiv>
 
 definition "my_problem \<equiv> Problem my_domain my_objs my_init my_goal"
 
-(* ---------------------- interpretation setup ------------------------- *)
-(* TODO *)
-
-lemma "wf_domain_c my_domain" by eval
-lemma "wf_problem_c my_problem" by eval
+lemma "wf_domain_x my_domain" by eval
+lemma "wf_problem_x my_problem" by eval
 
 subsection \<open> Execution \<close>
 
@@ -156,117 +156,129 @@ definition "my_plan \<equiv> [
   PAction ''drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G'']
 ]" (* Just taking the batmobile for a spin at the end, for fun. *)
 
-value "plan_action_enabled_c my_problem 
+value "enab_exec_x my_problem
   (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']) (set my_init)"
-value "execute_plan_action_c my_problem
-  (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D''])
-  (set my_init)"
-value "execute_plan_c my_problem my_plan (set my_init)"
-lemma "execute_plan_c my_problem my_plan (set my_init) \<^sup>c\<TTurnstile>\<^sub>\<equiv> my_goal" by eval
-lemma "valid_plan_c my_problem my_plan" by eval
 
-definition
-  "showvals f xs \<equiv> map (\<lambda>x. (x, f x)) xs"
+value "valid_plan_x my_problem my_plan"
+lemma "valid_plan_x my_problem my_plan = Inr()" by eval
+
 
 subsection \<open> Type normalization \<close>
 
+
+lemma "ast_domain.restrict_dom my_domain" by eval
+
 (* Type system shenanigans *)
-value "of_type_c my_domain (Either []) (Either [])"
-value "of_type_c my_domain (Either []) (Either [''Car'', ''FOO''])"
-value "of_type_c my_domain (Either [''FOO'', ''BONK'']) (Either [''BAR'', ''FOO''])"
-value "of_type_c my_domain (Either [''R'']) (Either [''object''])"
-value "is_of_type_c my_domain (objT_c my_problem)
-  (Obj ''c1'') (Either [''Car'', ''FOO''])"
+value "of_type_x my_domain (Either []) (Either [])"
+value "of_type_x my_domain (Either []) (Either [''FOO''])" (* even though FOO doesn't exist *)
+value "of_type_x my_domain (Either [''FOO'', ''BAR'']) (Either [''BAR'', ''FOO''])" (* even though both don't exist *)
+value "of_type_x my_domain (Either [''R'']) (Either [''object''])"
+
+declare ast_domain.constT_def [code]
+declare ast_problem.objT_def [code]
+
+value "ast_domain.is_of_type' (ast_problem.objT my_problem)
+  (ast_domain.STG my_domain) (Obj ''c1'') (Either [''Car'', ''FOO''])" (* even though FOO doesn't exist *)
 
 (* type normalization testing *)
 value "showvals (reachable_nodes my_types) my_type_names"
-value "type_preds my_domain"
-value "pred_for_type my_domain ''Car''"
-value "supertype_preds my_domain ''Car''"
-value "supertype_facts_for my_domain (my_objs ! 1)"
-value "type_precond my_domain (Var ''into'', Either [''Car'', ''Train''])"
-value "detype_ac my_domain op_load"
-value "detype_preds my_preds"
-lemma "wf_domain_c (detype_dom my_domain)" by eval
-lemma "wf_problem_c (detype_prob my_problem)" by eval
+value "ast_domain.type_preds my_domain"
+value "ast_domain.supertype_facts_for my_domain (my_objs ! 1)"
+value "ast_domain.type_precond my_domain (Var ''into'', Either [''Car'', ''Train''])"
+value "ast_domain.detype_ac my_domain op_load"
+value "ast_domain.detype_preds my_preds"
 
-definition "my_dom_detyped \<equiv> detype_dom my_domain"
-definition "my_prob_detyped \<equiv> detype_prob my_problem"
+definition "my_dom_detyped \<equiv> ast_domain.detype_dom my_domain"
 value "my_dom_detyped"
+definition "my_prob_detyped \<equiv> ast_problem.detype_prob my_problem"
 value "my_prob_detyped" (* Important *)
 
+(* redundant because of restr_problem2.detype_prob_wf *)
+lemma "wf_problem_x my_prob_detyped" by eval
 
-value "plan_action_enabled_c my_prob_detyped 
-  (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']) (set (init my_prob_detyped))"
-value "execute_plan_action_c my_prob_detyped
-  (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D''])
-  (set (init my_prob_detyped))"
-value "execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped))"
-lemma "execute_plan_c my_prob_detyped my_plan (set (init my_prob_detyped)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> goal my_prob_detyped" by eval
-lemma "valid_plan_c my_prob_detyped my_plan" by eval
+value "enab_exec_x my_prob_detyped
+  (my_plan ! 0) (ast_problem.I my_prob_detyped)"
+lemma "valid_plan_x my_prob_detyped my_plan = Inr()" by eval
 
-(* Goal normalization *)
-definition "my_dom_degoaled \<equiv> degoal_dom my_prob_detyped"
-definition "my_prob_degoaled \<equiv> degoal_prob my_prob_detyped"
+subsection \<open> Goal normalization \<close>
+
+definition "my_dom_degoaled \<equiv> ast_problem.degoal_dom my_prob_detyped"
+definition "my_prob_degoaled \<equiv> ast_problem.degoal_prob my_prob_detyped"
 value "my_prob_degoaled" (* Important *)
-definition "my_plan_2 \<equiv> my_plan @ [\<pi>\<^sub>g my_prob_detyped]"
+definition "my_plan_2 \<equiv> my_plan @ [ast_domain.\<pi>\<^sub>g my_dom_detyped]"
 value my_plan_2
-value "execute_plan_c my_prob_degoaled my_plan_2 (set (init my_prob_degoaled))"
-lemma "execute_plan_c my_prob_degoaled my_plan_2 (set (init my_prob_degoaled)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> goal my_prob_degoaled" by eval
+value "valid_plan_x my_prob_degoaled my_plan" (* missing goal planaction *)
+lemma "valid_plan_x my_prob_degoaled my_plan_2 = Inr ()" by eval
 
-(* Precondition normalization *)
+subsection \<open> Precondition normalization \<close>
 
-value "prefix_padding my_dom_degoaled"
-
-value "split_ac_names my_dom_degoaled op_drive 5"
-value "split_ac my_dom_degoaled op_drive"
-value "split_acs my_dom_degoaled"
-definition "my_dom_split \<equiv> split_dom my_dom_degoaled"
-definition "my_prob_split \<equiv> split_prob my_prob_degoaled"
+value "ast_domain.prefix_padding my_dom_degoaled"
+value "ast_domain.split_ac_names my_dom_degoaled op_drive 5"
+value "ast_domain.split_ac my_dom_degoaled op_drive"
+value "ast_domain.split_acs my_dom_degoaled"
+definition "my_dom_split \<equiv> ast_domain.split_dom my_dom_degoaled"
+definition "my_prob_split \<equiv> ast_problem.split_prob my_prob_degoaled"
 value "my_dom_split"
 value "my_prob_split" (* Important *)
 
+(* A little manual labor to decide which one of the split actions
+  corresponds to which step in the original plan. *)
 definition "my_plan_3 \<equiv> [
-  PAction ''0_drive'' [Obj ''c1'', Obj ''A'', Obj ''D''],
+  PAction ''1_drive'' [Obj ''c1'', Obj ''A'', Obj ''D''],
   PAction ''0_drive'' [Obj ''c1'', Obj ''D'', Obj ''C''],
-  PAction ''0_load'' [Obj ''p1'', Obj ''C'', Obj ''c1''],
-  PAction ''0_drive'' [Obj ''c1'', Obj ''C'', Obj ''D''],
-  PAction ''0_unload'' [Obj ''p1'', Obj ''c1'', Obj ''D''],  
+  PAction ''1_load'' [Obj ''p1'', Obj ''C'', Obj ''c1''],
+  PAction ''1_drive'' [Obj ''c1'', Obj ''C'', Obj ''D''],
+  PAction ''1_unload'' [Obj ''p1'', Obj ''c1'', Obj ''D''],  
   PAction ''0_choochoo'' [Obj ''t'', Obj ''E'', Obj ''D''],
   PAction ''0_load'' [Obj ''p1'', Obj ''D'', Obj ''t''],  
-  PAction ''0_choochoo'' [Obj ''t'', Obj ''D'', Obj ''E''],
+  PAction ''1_choochoo'' [Obj ''t'', Obj ''D'', Obj ''E''],
   PAction ''0_unload'' [Obj ''p1'', Obj ''t'', Obj ''E''],
 
   PAction ''0_drive'' [Obj ''c3'', Obj ''G'', Obj ''F''],
-  PAction ''0_load'' [Obj ''p2'', Obj ''F'', Obj ''c3''],
+  PAction ''1_load'' [Obj ''p2'', Obj ''F'', Obj ''c3''],
   PAction ''0_drive'' [Obj ''c3'', Obj ''F'', Obj ''E''],
-  PAction ''0_unload'' [Obj ''p2'', Obj ''c3'', Obj ''E''],
+  PAction ''1_unload'' [Obj ''p2'', Obj ''c3'', Obj ''E''],
 
-  PAction ''0_load'' [Obj ''p1'', Obj ''E'', Obj ''c3''],
+  PAction ''1_load'' [Obj ''p1'', Obj ''E'', Obj ''c3''],
   PAction ''0_drive'' [Obj ''c3'', Obj ''E'', Obj ''G''],
-  PAction ''0_unload'' [Obj ''p1'', Obj ''c3'', Obj ''G''],
+  PAction ''1_unload'' [Obj ''p1'', Obj ''c3'', Obj ''G''],
 
-  PAction ''0_choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
+  PAction ''1_choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
   PAction ''0_drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G''],
 
   PAction ''0_Goal_______'' []
 ]"
 
-(* execute_plan_c does not check for enabledness, btw *)
-value "execute_plan_c my_prob_split my_plan_3 (set (init my_prob_split))"
-lemma "execute_plan_c my_prob_split my_plan_3 (set (init my_prob_split)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> goal my_prob_split" by eval
+(* if you choose the wrong plan action at one point, this tells you where *)
+value "valid_plan_x my_prob_split my_plan_3"
 
-definition "my_plan_2_from_3 \<equiv> map (original_plan_ac my_dom_degoaled) my_plan_3"
-value "my_plan_2_from_3"
+value "enab_exec_x my_prob_split
+  (my_plan_3 ! 0) (ast_problem.I my_prob_split)"
+lemma "valid_plan_x my_prob_split my_plan_3 = Inr()" by eval
 
-value "execute_plan_c my_prob_degoaled my_plan_2_from_3 (set (init my_prob_degoaled))"
-lemma "execute_plan_c my_prob_degoaled my_plan_2_from_3 (set (init my_prob_degoaled)) \<^sup>c\<TTurnstile>\<^sub>\<equiv> goal my_prob_degoaled" by eval
+(* And this is how you would reconstruct the original plan from a plan obtained for the normalized
+instance: *)
 
-(* PDDL Relaxation *)
-(* Doesn't do anything yet as the running example doesn't have any negations in preconditions yet. *)
-definition "my_dom_relaxed \<equiv> relax_dom my_dom_split"
-definition "my_prob_relaxed \<equiv> relax_prob my_prob_split"
+definition "restored_plan \<equiv>
+  let p2 = ast_domain.restore_plan_split my_dom_degoaled my_plan_3 in
+  ast_domain.restore_plan_degoal my_dom_detyped p2"
+value "restored_plan" (* important *)
+lemma "valid_plan_x my_problem restored_plan = Inr()" by eval
+
+
+subsection \<open> PDDL Relaxation \<close>
+(* The only action with impacted preconditions is op_build_tracks *)
+value "actions (my_dom_split) ! 9"
+value "relax_ac (actions (my_dom_split) ! 9)"
+(* and here's a modified effect: *)
+value "actions (my_dom_split) ! 1"
+value "relax_ac (actions (my_dom_split) ! 1)"
+
+definition "my_dom_relaxed \<equiv> ast_domain.relax_dom my_dom_split"
+definition "my_prob_relaxed \<equiv> ast_problem.relax_prob my_prob_split"
 value my_prob_relaxed (* Important *)
 
+(* note that a plan is still valid after relaxation *)
+lemma "valid_plan_x my_prob_relaxed my_plan_3 = Inr()" by eval
 
 end

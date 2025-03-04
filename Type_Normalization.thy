@@ -29,6 +29,8 @@ definition (in ast_domain) restrict_dom :: bool where
   "restrict_dom \<equiv> single_types (consts D)
                   \<and> list_all1 wf_action_params (actions D)"
 
+
+
 locale restr_domain = wf_ast_domain +
   assumes restrict_dom: restrict_dom
 
@@ -1835,4 +1837,29 @@ theorem detyped_valid_iff:
   using match_valid_plan match_valid_plan' by blast
 
 end
+
+subsection \<open> Code Setup \<close>
+
+lemmas type_norm_code =
+  ast_domain.wf_action_params_def
+  ast_domain.restrict_dom_def
+  ast_domain.pred_for_type_def
+  ast_domain.type_pred.simps
+  ast_domain.type_preds_def
+  ast_domain.type_atom.simps
+  ast_domain.type_precond.simps
+  ast_domain.param_precond_def
+  ast_domain.detype_preds_def
+  ast_domain.detype_ent.simps
+  ast_domain.detype_ents_def
+  ast_domain.detype_ac.simps
+  ast_domain.detype_dom_def
+  ast_domain.supertype_facts_for.simps
+  ast_domain.supertype_facts_def
+  ast_problem.detype_prob_def
+  ast_domain.typeless_dom_def
+  ast_problem.typeless_prob_def
+declare type_norm_code[code]
+
+
 end
