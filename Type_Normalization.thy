@@ -57,7 +57,8 @@ begin
   
   abbreviation pred_names :: "name list" where
     "pred_names \<equiv> map (predicate.name \<circ> pred) (predicates D)"
-  
+
+  (* TODO: maybe better name, e.g. "____is_Car" *)
   definition pred_for_type :: "name \<Rightarrow> predicate" where
     "pred_for_type t \<equiv> Pred (safe_prefix pred_names @ t)"
 

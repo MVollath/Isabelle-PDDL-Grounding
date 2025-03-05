@@ -127,8 +127,11 @@ definition "my_goal \<equiv>
 
 definition "my_problem \<equiv> Problem my_domain my_objs my_init my_goal"
 
-lemma "wf_domain_x my_domain" by eval
-lemma "wf_problem_x my_problem" by eval
+lemma wf_d1: "ast_domain.wf_domain my_domain"
+  by (intro wf_domain_intro) eval
+
+lemma wf_p1: "ast_problem.wf_problem my_problem"
+  by (intro wf_problem_intro) eval
 
 subsection \<open> Execution \<close>
 
@@ -160,7 +163,8 @@ value "enab_exec_x my_problem
   (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']) (set my_init)"
 
 value "valid_plan_x my_problem my_plan"
-lemma "valid_plan_x my_problem my_plan = Inr()" by eval
+lemma "ast_problem.valid_plan my_problem my_plan"
+  by (intro valid_plan_intro[OF wf_p1]) eval
 
 
 subsection \<open> Type normalization \<close>
@@ -193,22 +197,29 @@ value "my_dom_detyped"
 definition "my_prob_detyped \<equiv> ast_problem.detype_prob my_problem"
 value "my_prob_detyped" (* Important *)
 
-(* redundant because of restr_problem2.detype_prob_wf *)
-lemma "wf_problem_x my_prob_detyped" by eval
+(* also follows from restr_problem2.detype_prob_wf *)
+lemma wf_p2: "ast_problem.wf_problem my_prob_detyped"
+  by (intro wf_problem_intro) eval
 
 value "enab_exec_x my_prob_detyped
   (my_plan ! 0) (ast_problem.I my_prob_detyped)"
-lemma "valid_plan_x my_prob_detyped my_plan = Inr()" by eval
+
+lemma "ast_problem.valid_plan my_prob_detyped my_plan"
+  by (intro valid_plan_intro[OF wf_p2]) eval
 
 subsection \<open> Goal normalization \<close>
 
 definition "my_dom_degoaled \<equiv> ast_problem.degoal_dom my_prob_detyped"
 definition "my_prob_degoaled \<equiv> ast_problem.degoal_prob my_prob_detyped"
 value "my_prob_degoaled" (* Important *)
+lemma wf_p3: "ast_problem.wf_problem my_prob_degoaled"
+  by (intro wf_problem_intro) eval
+
 definition "my_plan_2 \<equiv> my_plan @ [ast_domain.\<pi>\<^sub>g my_dom_detyped]"
 value my_plan_2
 value "valid_plan_x my_prob_degoaled my_plan" (* missing goal planaction *)
-lemma "valid_plan_x my_prob_degoaled my_plan_2 = Inr ()" by eval
+lemma "ast_problem.valid_plan my_prob_degoaled my_plan_2"
+  by (intro valid_plan_intro[OF wf_p3]) eval
 
 subsection \<open> Precondition normalization \<close>
 
@@ -220,6 +231,8 @@ definition "my_dom_split \<equiv> ast_domain.split_dom my_dom_degoaled"
 definition "my_prob_split \<equiv> ast_problem.split_prob my_prob_degoaled"
 value "my_dom_split"
 value "my_prob_split" (* Important *)
+lemma wf_p4: "ast_problem.wf_problem my_prob_split"
+  by (intro wf_problem_intro) eval
 
 (* A little manual labor to decide which one of the split actions
   corresponds to which step in the original plan. *)
@@ -254,7 +267,8 @@ value "valid_plan_x my_prob_split my_plan_3"
 
 value "enab_exec_x my_prob_split
   (my_plan_3 ! 0) (ast_problem.I my_prob_split)"
-lemma "valid_plan_x my_prob_split my_plan_3 = Inr()" by eval
+lemma "ast_problem.valid_plan my_prob_split my_plan_3"
+  by (intro valid_plan_intro[OF wf_p4]) eval
 
 (* And this is how you would reconstruct the original plan from a plan obtained for the normalized
 instance: *)
@@ -263,8 +277,8 @@ definition "restored_plan \<equiv>
   let p2 = ast_domain.restore_plan_split my_dom_degoaled my_plan_3 in
   ast_domain.restore_plan_degoal my_dom_detyped p2"
 value "restored_plan" (* important *)
-lemma "valid_plan_x my_problem restored_plan = Inr()" by eval
-
+lemma "ast_problem.valid_plan my_problem restored_plan"
+  by (intro valid_plan_intro[OF wf_p1]) eval
 
 subsection \<open> PDDL Relaxation \<close>
 (* The only action with impacted preconditions is op_build_tracks *)
@@ -277,8 +291,11 @@ value "relax_ac (actions (my_dom_split) ! 1)"
 definition "my_dom_relaxed \<equiv> ast_domain.relax_dom my_dom_split"
 definition "my_prob_relaxed \<equiv> ast_problem.relax_prob my_prob_split"
 value my_prob_relaxed (* Important *)
+lemma wf_p5: "ast_problem.wf_problem my_prob_relaxed"
+  by (intro wf_problem_intro) eval
 
 (* note that a plan is still valid after relaxation *)
-lemma "valid_plan_x my_prob_relaxed my_plan_3 = Inr()" by eval
+lemma "ast_problem.valid_plan my_prob_relaxed my_plan_3"
+  by (intro valid_plan_intro[OF wf_p5]) eval
 
 end

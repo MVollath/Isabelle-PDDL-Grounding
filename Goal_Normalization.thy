@@ -1,6 +1,7 @@
 theory Goal_Normalization
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    Type_Normalization Utils AbLa_alts DNF
+    String_Shenanigans Utils AbLa_alts DNF
+    Type_Normalization
 begin
 
 context ast_domain begin
