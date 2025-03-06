@@ -1,7 +1,6 @@
 theory Utils
   imports
     "Propositional_Proof_Systems.Sema"
-    "Propositional_Proof_Systems.CNF_Formulas"
 begin
 
 (* for testing *)
@@ -18,14 +17,6 @@ fun showsteps :: "('a \<Rightarrow> 'b \<Rightarrow> 'a) \<Rightarrow> 'a \<Righ
 text \<open> Not using the default list_all because it makes proofs cumbersome \<close>
 abbreviation (input) list_all1 where
   "list_all1 P xs \<equiv> \<forall>x \<in> set xs. P x"
-
-(* lists *)
-
-fun sublist_until :: "'a list \<Rightarrow> 'a \<Rightarrow> 'a list" where
-  "sublist_until [] a = []" |
-  "sublist_until (x # xs) a =
-    (if x = a then [] else x # sublist_until xs a)"
-
 
 (* rule rewriting *)
 
@@ -44,35 +35,26 @@ lemma conj_split_7:
   shows "A" "B" "C" "D" "E" "F" "G"
   using assms by simp_all
 
-(* formula helpers *)
-(* consider right deep prop (A&B) \<longleftrightarrow> literal A & prop B *)
+(* proof rules *)
 
-fun only_conj :: "'a formula \<Rightarrow> bool" where
-  "only_conj (Atom a) \<longleftrightarrow> True" | (* literal *)
-  "only_conj (\<^bold>\<not> (Atom a)) \<longleftrightarrow> True" | (* literal *)
-  "only_conj \<bottom> \<longleftrightarrow> True" | (* literal *)
-  "only_conj (\<^bold>\<not>\<bottom>) \<longleftrightarrow> True" | (* literal *)
+lemma eq_contr: "(a = b \<Longrightarrow> False) \<Longrightarrow> a \<noteq> b"
+  by auto
 
-  "only_conj (\<phi> \<^bold>\<and> \<psi>) \<longleftrightarrow> only_conj \<phi> \<and> only_conj \<psi>" | (* conjunct *)
+(* lists *)
 
-  "only_conj (\<^bold>\<not> _) \<longleftrightarrow> False" |
-  "only_conj (_ \<^bold>\<or> _) \<longleftrightarrow> False" |
-  "only_conj (_ \<^bold>\<rightarrow> _) \<longleftrightarrow> False"
+fun sublist_until :: "'a list \<Rightarrow> 'a \<Rightarrow> 'a list" where
+  "sublist_until [] a = []" |
+  "sublist_until (x # xs) a =
+    (if x = a then [] else x # sublist_until xs a)"
 
-fun in_dnf :: "'a formula \<Rightarrow> bool" where
-  "in_dnf (Atom a) \<longleftrightarrow> True" | (* literal *)
-  "in_dnf (\<^bold>\<not> (Atom a)) \<longleftrightarrow> True" | (* literal *)
-  "in_dnf \<bottom> \<longleftrightarrow> True" | (* literal *)
-  "in_dnf (\<^bold>\<not>\<bottom>) \<longleftrightarrow> True" | (* literal *)
+lemma sublist_just_until:
+  assumes "x \<in> set xs"
+  shows "\<exists>ys. sublist_until xs x @ [x] @ ys = xs"
+  using assms by (induction xs) auto
 
-  "in_dnf (\<phi> \<^bold>\<or> \<psi>) \<longleftrightarrow> in_dnf \<phi> \<and> in_dnf \<psi>" | (* disjunct *)
-  "in_dnf (\<phi> \<^bold>\<and> \<psi>) \<longleftrightarrow> only_conj \<phi> \<and> only_conj \<psi>" | (* conjunct *)
-
-  "in_dnf (\<^bold>\<not> _) \<longleftrightarrow> False" |
-  "in_dnf (_ \<^bold>\<rightarrow> _) \<longleftrightarrow> False"
-  
-
-(* random lemmas *)
+lemma notin_sublist_until:
+  "x \<notin> set (sublist_until xs x)"
+  by (induction xs) simp_all
 
 lemma map_of_in_R_iff: "x \<in> fst ` set m \<longleftrightarrow> (\<exists>y. map_of m x = Some y)"
   by (metis map_of_eq_None_iff not_None_eq)
@@ -127,7 +109,13 @@ lemma bigAnd_atoms: "atoms (\<^bold>\<And> \<phi>s) = \<Union>(atoms ` set \<phi
 lemma bigOr_atoms: "atoms (\<^bold>\<Or> \<phi>s) = \<Union>(atoms ` set \<phi>s)"
   by (induction \<phi>s) simp_all
 
-thm irrelevant_atom
+text \<open> Single formula entailment, since entailment has a formula set on the left side... \<close>
+
+definition fmla_entailment :: "'a formula \<Rightarrow> 'a formula \<Rightarrow> bool" ("(_ \<TTurnstile>\<^sub>1/ _)" [53,53] 53) where
+  "F \<TTurnstile>\<^sub>1 G \<equiv> \<forall>\<A>. \<A> \<Turnstile> F \<longrightarrow> \<A> \<Turnstile> G"
+
+lemma fmla_ent_ent: "F \<TTurnstile>\<^sub>1 G \<Longrightarrow> \<Gamma> \<TTurnstile> F \<Longrightarrow> \<Gamma> \<TTurnstile> G"
+  using fmla_entailment_def entailment_def by metis
 
 text \<open> Other formula properties \<close>
 

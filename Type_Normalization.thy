@@ -875,12 +875,7 @@ end
 context restr_problem
 begin
 lemma (in restr_problem2) sf_basic: "wm_basic sf_substate"
-proof -
-  have "sf_substate \<subseteq> set (init P2)" using detype_prob_def by simp
-  moreover have "wm_basic (set (init P2))" using wm_basic_def detype_prob_wf
-    using p2.wf_P(4) p2.wf_fmla_atom_alt p2.wf_world_model_def by auto
-  ultimately show ?thesis using wm_basic_def by blast
-qed
+  using p2.i_basic unfolding wm_basic_def by simp
 
 lemma typeatm_iff_obj_listed:
   assumes "type_atom n t \<in> sf_substate"
@@ -1261,8 +1256,7 @@ proof -
   obtain n args where pi: "\<pi> = PAction n args" by (cases \<pi>; simp)
   let ?pi = "PAction n args"
 
-  have s_basic: "wm_basic s"
-    using assms wf_world_model_def wf_fmla_atom_alt wm_basic_def by metis
+  from assms have s_basic: "wm_basic s" using wf_wm_basic by simp
 
   {
     assume assm: "plan_action_enabled ?pi s"
@@ -1442,7 +1436,7 @@ qed
 lemma match_goal:
   assumes "states_match s s'"
   shows "s \<^sup>c\<TTurnstile>\<^sub>= goal P \<longleftrightarrow> s' \<^sup>c\<TTurnstile>\<^sub>= goal P2"
-  using goal_sem assms wm_basic_def wf_world_model_def wf_fmla_atom_alt by metis
+  using assms goal_sem wf_wm_basic by simp
 
 lemma match_valid_plan_from:
   assumes "states_match s s'" "valid_plan_from s \<pi>s"
@@ -1471,14 +1465,13 @@ next
   with enab2 show ?case using p2.valid_plan_from_def plan_action_path_Cons by simp
 qed
 
+lemma inits_match:
+  shows "states_match I p2.I" using wf_I by auto
+
 lemma match_valid_plan:
   assumes "valid_plan \<pi>s" shows "p2.valid_plan \<pi>s"
-proof -
-  have "states_match I p2.I"
-    using ast_problem.I_def wf_I by auto
-  thus ?thesis
-  using assms match_valid_plan_from ast_problem.valid_plan_def by metis
-qed
+  using assms unfolding ast_problem.valid_plan_def
+  using match_valid_plan_from inits_match by blast
 
 text \<open>Proving: p2.valid_plan \<pi>s \<Longrightarrow> valid_plan \<pi>s \<close>
 
@@ -1503,9 +1496,9 @@ proof -
     by (metis (no_types, lifting) Diff_cancel Int_left_commute Un_Diff Un_Diff_Int Un_Int_eq(4) inf_sup_absorb sf_disj_wf_wm)
 qed
 
-lemma rp_init: "RP (set (init P2))"
+lemma rp_init: "RP p2.I"
 proof -
-  have "set (init P2) = set (init P) \<union> sf_substate" by auto
+  have "p2.I = I \<union> sf_substate" by auto
   thus ?thesis using wf_P(4) by auto
 qed
 
@@ -1587,12 +1580,8 @@ qed
 
 lemma match_valid_plan':
   assumes "p2.valid_plan \<pi>s" shows "valid_plan \<pi>s"
-proof -
-  have "states_match I p2.I"
-    using ast_problem.I_def wf_I by auto
-  thus ?thesis
-    using assms match_valid_plan_from' ast_problem.valid_plan_def by metis
-qed
+  using assms unfolding ast_problem.valid_plan_def
+  using match_valid_plan_from' inits_match by blast
 
 (* putting it together: *)
 

@@ -190,6 +190,28 @@ lemma (in ast_domain) bigor_wf:
   shows "wf_fmla tyt (\<^bold>\<Or> \<phi>s)"
   using assms by (induction \<phi>s; simp)
 
+lemma (in ast_problem) wf_wm_basic:
+  "wf_world_model M \<Longrightarrow> wm_basic M"
+  using wf_world_model_def wf_fmla_atom_alt wm_basic_def by metis
+
+lemma (in wf_ast_problem) i_basic:
+  "wm_basic I"
+  using wf_I wf_wm_basic by simp
+
+(* could be in ast_domain but wf_atom_mono is in ast_problem *)
+lemma (in ast_problem) wf_fmla_mono:
+  assumes "tys \<subseteq>\<^sub>m tys'" "wf_fmla tys \<phi>"
+  shows "wf_fmla tys' \<phi>"
+  using assms apply (induction \<phi>)
+  apply (simp add: wf_atom_mono) by simp_all
+
+(* could be in ast_domain but wf_fmla_atom_mono is in ast_problem *)
+lemma (in ast_problem) wf_eff_mono:
+  assumes "tys \<subseteq>\<^sub>m tys'" "wf_effect tys eff"
+  shows "wf_effect tys' eff"
+  using assms apply (cases eff)
+  using wf_fmla_atom_mono by auto
+
 text \<open> Properties of sig \<close>
 
 abbreviation "split_pred \<equiv> (\<lambda>PredDecl p n \<Rightarrow> (p, n))"
@@ -288,6 +310,30 @@ theorem (in wf_ast_problem) wf_execute_stronger:
   qed
 
 text \<open> Semantics \<close>
+
+lemma (in ast_problem) plan_action_path_append_intro:
+  assumes "plan_action_path M1 \<pi>s M2 \<and> plan_action_path M2 \<mu>s M3"
+  shows "plan_action_path M1 (\<pi>s @ \<mu>s) M3"
+  using assms apply (induction \<pi>s arbitrary: M1)
+  using plan_action_path_def apply simp
+  using plan_action_path_def plan_action_path_Cons
+  by (metis append_Cons)
+
+lemma (in ast_problem) plan_action_path_append_elim:
+  assumes "plan_action_path M1 (\<pi>s @ \<mu>s) M3"
+  shows "\<exists>M2. plan_action_path M1 \<pi>s M2 \<and> plan_action_path M2 \<mu>s M3"
+using assms by (induction \<pi>s arbitrary: M1) auto
+
+lemma (in wf_ast_problem) valid_plan_from_Cons[simp]:
+  "valid_plan_from M (\<pi> # \<pi>s)
+    \<longleftrightarrow> valid_plan_from (execute_plan_action \<pi> M) \<pi>s \<and> plan_action_enabled \<pi> M"
+  using valid_plan_from_def by auto
+
+lemma (in wf_ast_problem) valid_plan_from_snoc:
+  "valid_plan_from M (\<pi>s @ [\<pi>])
+    \<longleftrightarrow> (\<exists>M'. plan_action_path M \<pi>s M' \<and> plan_action_enabled \<pi> M' \<and>
+    execute_plan_action \<pi> M' \<^sup>c\<TTurnstile>\<^sub>= goal P)"
+  using valid_plan_from_def by (induction \<pi>s arbitrary: M; simp)
 
 lemma entail_adds_irrelevant:
   assumes "wm_basic M" "wm_basic A"

@@ -7,29 +7,27 @@ text \<open>This theory concerns itself mostly with relationships between two PD
   new instances that retain some of the previous properties.\<close>
 
 lemma co_fmla_wf:
-  assumes "\<And>a. ast_domain.wf_atom d1 tyt1 a \<longrightarrow> ast_domain.wf_atom d2 tyt2 a"
-  shows "ast_domain.wf_fmla d1 tyt1 \<phi> \<longrightarrow> ast_domain.wf_fmla d2 tyt2 \<phi>"
+  assumes "\<And>a. ast_domain.wf_atom d1 tyt1 a \<Longrightarrow> ast_domain.wf_atom d2 tyt2 a"
+  shows "ast_domain.wf_fmla d1 tyt1 \<phi> \<Longrightarrow> ast_domain.wf_fmla d2 tyt2 \<phi>"
   using assms apply (induction \<phi>)
   using ast_domain.wf_fmla.simps apply metis+
   done
 
 lemma co_fmla_atom_wf:
-  assumes "\<And>a. ast_domain.wf_atom d1 tyt1 a \<longrightarrow> ast_domain.wf_atom d2 tyt2 a"
-  shows "ast_domain.wf_fmla_atom d1 tyt1 \<phi> \<longrightarrow> ast_domain.wf_fmla_atom d2 tyt2 \<phi>"
+  assumes "\<And>a. ast_domain.wf_atom d1 tyt1 a \<Longrightarrow> ast_domain.wf_atom d2 tyt2 a"
+  shows "ast_domain.wf_fmla_atom d1 tyt1 \<phi> \<Longrightarrow> ast_domain.wf_fmla_atom d2 tyt2 \<phi>"
   using assms co_fmla_wf ast_domain.wf_fmla_atom_alt by metis
 
 lemma co_effect_wf:
-  assumes "\<And>a. ast_domain.wf_atom d1 tyt1 a \<longrightarrow> ast_domain.wf_atom d2 tyt2 a"
-  shows "ast_domain.wf_effect d1 tyt1 \<epsilon> \<longrightarrow> ast_domain.wf_effect d2 tyt2 \<epsilon>"
+  assumes "\<And>a. ast_domain.wf_atom d1 tyt1 a \<Longrightarrow> ast_domain.wf_atom d2 tyt2 a"
+  shows "ast_domain.wf_effect d1 tyt1 \<epsilon> \<Longrightarrow> ast_domain.wf_effect d2 tyt2 \<epsilon>"
   using assms co_fmla_atom_wf ast_domain.wf_effect_alt by metis
 
 lemma co_wm_wf:
   assumes "\<And>a. ast_domain.wf_atom (domain p1) (ast_problem.objT p1) a
-    \<longrightarrow> ast_domain.wf_atom (domain p2) (ast_problem.objT p2) a"
-  shows "ast_problem.wf_world_model p1 m \<longrightarrow> ast_problem.wf_world_model p2 m"
+    \<Longrightarrow> ast_domain.wf_atom (domain p2) (ast_problem.objT p2) a"
+  shows "ast_problem.wf_world_model p1 m \<Longrightarrow> ast_problem.wf_world_model p2 m"
   using assms co_fmla_atom_wf ast_problem.wf_world_model_def by metis
-
-lemmas co_wf = co_fmla_wf co_fmla_atom_wf co_effect_wf co_wm_wf
 
 subsection \<open> Formula Preds \<close>
 
