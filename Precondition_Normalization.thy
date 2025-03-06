@@ -1,6 +1,6 @@
 theory Precondition_Normalization
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    String_Shenanigans AbLa_alts DNF
+    String_Shenanigans PDDL_Sema_Supplement DNF
 begin
 
 (*

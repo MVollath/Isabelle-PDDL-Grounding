@@ -1,6 +1,6 @@
 theory PDDL_Relaxation
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    Utils AbLa_alts
+    Utils PDDL_Sema_Supplement
 begin
 
 (* This is only defined for pure conjunctive clauses. *)

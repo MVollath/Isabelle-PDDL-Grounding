@@ -1,7 +1,6 @@
 theory Goal_Normalization
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    String_Shenanigans Utils AbLa_alts DNF
-    Type_Normalization
+    String_Shenanigans Utils PDDL_Sema_Supplement DNF
 begin
 
 context ast_domain begin
@@ -47,7 +46,6 @@ abbreviation "restore_plan_degoal \<pi>s \<equiv> sublist_until \<pi>s \<pi>\<^s
 
 end
 
-
 abbreviation (in ast_problem) (input) "D3 \<equiv> degoal_dom"
 abbreviation (in ast_problem) (input) "P3 \<equiv> degoal_prob"
 
@@ -62,14 +60,14 @@ sublocale wf_ast_problem3 \<subseteq> p3: ast_problem P3 .
 subsection \<open> Alternate/simplified definitions\<close>
 context ast_problem begin
 
-lemma degoal_dom_sel:
+lemma degoal_dom_sel[simp]:
   "types D3 = types D"
   "predicates D3 = goal_pred_decl # predicates D"
   "consts D3 = objects P @ consts D"
   "actions D3 = goal_ac term_goal # actions D"
   using degoal_dom_def by simp_all
 
-lemma degoal_prob_sel:
+lemma degoal_prob_sel[simp]:
   "domain P3 = degoal_dom"
   "objects P3 = []"
   "init P3 = init P"
@@ -140,10 +138,9 @@ lemma g_sig:
 proof -
   from assms have "PredDecl p xs \<in> set (predicates D3)"
     using sig_Some degoal_dom_sel by simp
-  thus ?thesis using pred_resolve g_preds_dist degoal_dom_sel d3.sig_def by metis
+  thus ?thesis using g_preds_dist degoal_dom_sel d3.sig_def
+    using ast_domain.pred_resolve by blast
 qed
-
-term ast_domain.ac_tsubst
 
 lemma g_fmla_wf:
   assumes "wf_fmla tyt \<phi>" shows "d3.wf_fmla tyt \<phi>"
@@ -338,7 +335,7 @@ qed (simp add: term_to_obj)
 
 lemma term_to_obj_fmla:
   shows "map_atom_fmla (ac_tsubst [] []) (map_atom_fmla term.CONST F) = F"
-  by (induction F; simp add: term_to_obj_atom)
+  using term_to_obj_atom by (induction F; simp)
 
 lemma resinst_ac_g:
   "p3.resolve_instantiate \<pi>\<^sub>g = Ground_Action (goal P) goal_effect"
@@ -347,8 +344,7 @@ proof -
   hence "p3.resolve_instantiate \<pi>\<^sub>g = Ground_Action
     (map_atom_fmla (ac_tsubst [] []) term_goal)
     (map_ast_effect (ac_tsubst [] []) goal_effect)"
-    using goal_ac_def p3.resolve_instantiate_cond
-    by (simp add: degoal_prob_sel(1))
+    using goal_ac_def p3.resolve_instantiate_cond by fastforce
   moreover have "(map_ast_effect (ac_tsubst [] []) goal_effect) = goal_effect" by simp
     (* Very simple because there are no parameters, so nothing is actually being mapped.
        Only the type of an empty list is changed. *)
@@ -382,7 +378,7 @@ proof -
   hence "valuation (p3.execute_plan_action \<pi>\<^sub>g M) \<Turnstile> goal P3" using degoal_prob_sel(4)
     using valuation_def by simp
   with basic show "p3.execute_plan_action \<pi>\<^sub>g M \<^sup>c\<TTurnstile>\<^sub>= goal P3"
-    using valuation_iff_close_world by simp
+    using valuation_iff_close_world by blast
 qed
 
 lemma g_obj_of_type:

@@ -1,6 +1,6 @@
 theory PDDL_Checker_Utils
   imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"
-    AbLa_alts
+    PDDL_Sema_Supplement
 begin
 
 abbreviation "of_type_x D oT T \<equiv> of_type_impl (ast_domain.STG D) oT T"

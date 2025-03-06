@@ -190,7 +190,7 @@ value "ast_domain.type_preds my_domain"
 value "ast_domain.supertype_facts_for my_domain (my_objs ! 1)"
 value "ast_domain.type_precond my_domain (Var ''into'', Either [''Car'', ''Train''])"
 value "ast_domain.detype_ac my_domain op_load"
-value "ast_domain.detype_preds my_preds"
+value "detype_preds my_preds"
 
 definition "my_dom_detyped \<equiv> ast_domain.detype_dom my_domain"
 value "my_dom_detyped"

@@ -2,7 +2,6 @@ theory Utils
   imports
     "Propositional_Proof_Systems.Sema"
     "Propositional_Proof_Systems.CNF_Formulas"
-    "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
 begin
 
 (* for testing *)
@@ -128,36 +127,12 @@ lemma bigAnd_atoms: "atoms (\<^bold>\<And> \<phi>s) = \<Union>(atoms ` set \<phi
 lemma bigOr_atoms: "atoms (\<^bold>\<Or> \<phi>s) = \<Union>(atoms ` set \<phi>s)"
   by (induction \<phi>s) simp_all
 
-
-subsection \<open> Formula Preds \<close>
-
-fun fmla_preds :: "'ent atom formula \<Rightarrow> predicate set" where
-  "fmla_preds (Atom (predAtm p xs)) = {p}" |
-  "fmla_preds (Atom (Eq a b)) = {}" |
-  "fmla_preds \<bottom> = {}" |
-  "fmla_preds (\<^bold>\<not> \<phi>) = fmla_preds \<phi>" |
-  "fmla_preds (\<phi>\<^sub>1 \<^bold>\<and> \<phi>\<^sub>2) = fmla_preds \<phi>\<^sub>1 \<union> fmla_preds \<phi>\<^sub>2" |
-  "fmla_preds (\<phi>\<^sub>1 \<^bold>\<or> \<phi>\<^sub>2) = fmla_preds \<phi>\<^sub>1 \<union> fmla_preds \<phi>\<^sub>2" |
-  "fmla_preds (\<phi>\<^sub>1 \<^bold>\<rightarrow> \<phi>\<^sub>2) = fmla_preds \<phi>\<^sub>1 \<union> fmla_preds \<phi>\<^sub>2"
-
-lemma fmla_preds_alt: "fmla_preds \<phi> = {p | p xs. predAtm p xs \<in> atoms \<phi>}"
-  apply (induction \<phi>)
-  subgoal for x
-    apply (cases x; simp_all)
-    done
-  by auto
-
-
-lemma map_preserves_fmla_preds: "fmla_preds F = fmla_preds ((map_formula \<circ> map_atom) f F)"
-proof (induction F)
-  case (Atom x)
-  thus ?case by (cases x) simp_all
-qed auto
-
-lemma notin_fmla_preds_notin_atoms: "p \<notin> fmla_preds \<phi> \<Longrightarrow> predAtm p args \<notin> atoms \<phi>"
-  using fmla_preds_alt by blast
-
 thm irrelevant_atom
+
+text \<open> Other formula properties \<close>
+
+lemma map_formula_bigOr: "(\<^bold>\<Or> (map (map_formula f) \<phi>s)) = map_formula f (\<^bold>\<Or> \<phi>s)"
+  by (induction \<phi>s; simp_all)
 
 subsection \<open> STRIPS Formulas \<close>
 
