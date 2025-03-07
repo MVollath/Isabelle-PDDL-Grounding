@@ -45,6 +45,11 @@ abbreviation "restore_plan_degoal \<pi>s \<equiv> sublist_until \<pi>s \<pi>\<^s
 
 end
 
+text \<open> locale setup for simplified syntax \<close>
+
+(* no ast_domain3 etc, because the degoaled domain requires the whole
+  problem as input, anyway. As such, D3 isn't defined in ast_domain. *)
+
 abbreviation (in ast_problem) (input) "D3 \<equiv> degoal_dom"
 abbreviation (in ast_problem) (input) "P3 \<equiv> degoal_prob"
 
@@ -67,21 +72,15 @@ lemma degoal_dom_sel[simp]:
   using degoal_dom_def by simp_all
 
 lemma degoal_prob_sel[simp]:
-  "domain P3 = degoal_dom"
+  "domain P3 = D3"
   "objects P3 = []"
   "init P3 = init P"
   "goal P3 = Atom (predAtm goal_pred [])"
   using degoal_prob_def by simp_all
 end
 
-subsection \<open>Output format\<close>
-
-context ast_problem3 begin
-
-lemmas goal_format = degoal_prob_sel(4) degoal_dom_sel(1)
-
-
-end
+text \<open> There aren't really any better lemmas to describe that the output has the required format
+  than degoal_dom_sel and degoal_prob_sel \<close>
 
 subsection \<open>Well-Formedness\<close>
 

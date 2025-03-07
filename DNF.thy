@@ -80,6 +80,17 @@ qed
 definition dnf_list :: "'a formula \<Rightarrow> 'a formula list" where
   "dnf_list F \<equiv> map (neg_conj_of_clause) (cnf_lists (nnf (\<^bold>\<not>F)))"
 
+lemma dnf_list_conjs:
+  "\<forall>\<psi> \<in> set (dnf_list \<phi>). is_conj \<psi>"
+proof -
+  have "is_lit_plus (neg_of_lit c)" for c
+    by (cases c) simp_all
+  hence "is_conj (neg_conj_of_clause c)" for c
+    unfolding neg_conj_of_clause_def
+    by (induction c) auto
+  thus ?thesis unfolding dnf_list_def by auto
+qed
+
 lemma dnf_list_semantics:
   fixes F :: "'a formula"
   shows "(A \<Turnstile> F) \<longleftrightarrow> (\<exists>c \<in> set (dnf_list F). A \<Turnstile> c)"

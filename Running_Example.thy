@@ -29,7 +29,6 @@ definition "my_types \<equiv> [
   (''Car'', ''Vehicle''), (''Train'', ''Vehicle''),
   (''R'', ''L''), (''L'', ''R''),
   (''Batmobile'', ''Car''), (''Batmobile'', ''Train'')]"
-definition "my_type_names \<equiv> ''object'' # map fst my_types"
 (* purposely doing Car/Train instead of only Vehicle, for no reason other than to just use that feature somewhere *)
 definition "my_preds \<equiv> [
   PredDecl (Pred ''at'') [Either [''Movable''], Either [''City'']],
@@ -185,6 +184,7 @@ value "ast_domain.is_of_type' (ast_problem.objT my_problem)
   (ast_domain.STG my_domain) (Obj ''c1'') (Either [''Car'', ''FOO''])" (* even though FOO doesn't exist *)
 
 (* type normalization testing *)
+definition "my_type_names \<equiv> ast_domain.type_names my_domain"
 value "showvals (reachable_nodes my_types) my_type_names"
 value "ast_domain.type_preds my_domain"
 value "ast_domain.supertype_facts_for my_domain (my_objs ! 1)"
@@ -237,27 +237,27 @@ lemma wf_p4: "ast_problem.wf_problem my_prob_split"
 (* A little manual labor to decide which one of the split actions
   corresponds to which step in the original plan. *)
 definition "my_plan_3 \<equiv> [
-  PAction ''1_drive'' [Obj ''c1'', Obj ''A'', Obj ''D''],
-  PAction ''0_drive'' [Obj ''c1'', Obj ''D'', Obj ''C''],
-  PAction ''1_load'' [Obj ''p1'', Obj ''C'', Obj ''c1''],
-  PAction ''1_drive'' [Obj ''c1'', Obj ''C'', Obj ''D''],
-  PAction ''1_unload'' [Obj ''p1'', Obj ''c1'', Obj ''D''],  
-  PAction ''0_choochoo'' [Obj ''t'', Obj ''E'', Obj ''D''],
-  PAction ''0_load'' [Obj ''p1'', Obj ''D'', Obj ''t''],  
-  PAction ''1_choochoo'' [Obj ''t'', Obj ''D'', Obj ''E''],
-  PAction ''0_unload'' [Obj ''p1'', Obj ''t'', Obj ''E''],
+  PAction ''0_drive'' [Obj ''c1'', Obj ''A'', Obj ''D''],
+  PAction ''1_drive'' [Obj ''c1'', Obj ''D'', Obj ''C''],
+  PAction ''0_load'' [Obj ''p1'', Obj ''C'', Obj ''c1''],
+  PAction ''0_drive'' [Obj ''c1'', Obj ''C'', Obj ''D''],
+  PAction ''0_unload'' [Obj ''p1'', Obj ''c1'', Obj ''D''],  
+  PAction ''1_choochoo'' [Obj ''t'', Obj ''E'', Obj ''D''],
+  PAction ''1_load'' [Obj ''p1'', Obj ''D'', Obj ''t''],  
+  PAction ''0_choochoo'' [Obj ''t'', Obj ''D'', Obj ''E''],
+  PAction ''1_unload'' [Obj ''p1'', Obj ''t'', Obj ''E''],
 
-  PAction ''0_drive'' [Obj ''c3'', Obj ''G'', Obj ''F''],
-  PAction ''1_load'' [Obj ''p2'', Obj ''F'', Obj ''c3''],
-  PAction ''0_drive'' [Obj ''c3'', Obj ''F'', Obj ''E''],
-  PAction ''1_unload'' [Obj ''p2'', Obj ''c3'', Obj ''E''],
+  PAction ''1_drive'' [Obj ''c3'', Obj ''G'', Obj ''F''],
+  PAction ''0_load'' [Obj ''p2'', Obj ''F'', Obj ''c3''],
+  PAction ''1_drive'' [Obj ''c3'', Obj ''F'', Obj ''E''],
+  PAction ''0_unload'' [Obj ''p2'', Obj ''c3'', Obj ''E''],
 
-  PAction ''1_load'' [Obj ''p1'', Obj ''E'', Obj ''c3''],
-  PAction ''0_drive'' [Obj ''c3'', Obj ''E'', Obj ''G''],
-  PAction ''1_unload'' [Obj ''p1'', Obj ''c3'', Obj ''G''],
+  PAction ''0_load'' [Obj ''p1'', Obj ''E'', Obj ''c3''],
+  PAction ''1_drive'' [Obj ''c3'', Obj ''E'', Obj ''G''],
+  PAction ''0_unload'' [Obj ''p1'', Obj ''c3'', Obj ''G''],
 
-  PAction ''1_choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
-  PAction ''0_drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G''],
+  PAction ''0_choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
+  PAction ''1_drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G''],
 
   PAction ''0_Goal_______'' []
 ]"
