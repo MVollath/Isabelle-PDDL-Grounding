@@ -111,7 +111,52 @@ proof -
   finally show ?thesis using nF_def dnf_list_def by metis
 qed
 
+subsection \<open> atoms \<close>
 
+(* CNF stuff *)
 
+lemma nnf_atoms [simp]: "atoms (nnf F) = atoms F"
+  by (induction F rule: nnf.induct) simp_all
+
+(* unused *)
+(* Btw, equality doesn't hold:
+  "\<Union>(atoms ` form_of_lit ` \<Union>(cnf F)) = atoms F"
+  Because of cases like this, where atoms are "lost": *)
+value "cnf (((\<^bold>\<not>\<bottom>) \<^bold>\<or> Atom 5) :: nat formula)" (* ... = {} *)
+lemma cnf_atoms:
+  assumes "is_nnf F" shows "\<forall>d \<in> cnf F. \<forall>l \<in> d. atoms (form_of_lit l) \<subseteq> atoms F"
+  using assms proof (induction F)
+  case (Not F)
+  then show ?case using is_nnf_NotD by fastforce
+qed (auto simp add: is_nnf_NotD)
+
+lemma cnf_lists_atoms:
+  assumes "is_nnf F" shows "\<forall>d \<in> set (cnf_lists F). \<forall>l \<in> set d. atoms (form_of_lit l) \<subseteq> atoms F"
+  using assms proof (induction F)
+  case (Not F)
+  then show ?case using is_nnf_NotD by fastforce
+qed (auto simp add: is_nnf_NotD)
+
+(* unused *)
+lemma form_of_cnf_atoms: "a \<in> atoms (form_of_cnf C) \<longleftrightarrow> (\<exists>c \<in> set C. (\<exists> l \<in> set c. a \<in> atoms (form_of_lit l)))"
+  unfolding form_of_cnf_def disj_of_clause_def by simp
+
+(* unused *)
+lemma cnf_form_atoms:
+  assumes "is_nnf F" shows "atoms (cnf_form_of F) \<subseteq> atoms F"
+  unfolding cnf_form_of_def
+  using cnf_lists_atoms form_of_cnf_atoms assms by fastforce
+
+lemma neg_of_lit_atoms: "atoms (neg_of_lit l) = atoms (form_of_lit l)"
+  by (cases l) simp_all
+
+(* TODO clarify *)
+lemma dnf_list_atoms:
+  "\<forall>c \<in> set (dnf_list F). atoms c \<subseteq> atoms F"
+proof -
+  have "\<forall>c \<in> set (cnf_lists (nnf (\<^bold>\<not>F))). \<forall>l \<in> set c. atoms (neg_of_lit l) \<subseteq> atoms F"
+    using cnf_lists_atoms is_nnf_nnf neg_of_lit_atoms by force
+  thus ?thesis unfolding dnf_list_def neg_conj_of_clause_def by fastforce
+qed
 
 end

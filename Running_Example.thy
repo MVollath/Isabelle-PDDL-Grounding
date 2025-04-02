@@ -224,7 +224,7 @@ lemma "ast_problem.valid_plan my_prob_degoaled my_plan_2"
 subsection \<open> Precondition normalization \<close>
 
 value "ast_domain.prefix_padding my_dom_degoaled"
-value "ast_domain.split_ac_names my_dom_degoaled op_drive 5"
+value "ast_domain.split_ac_names my_dom_degoaled op_drive"
 value "ast_domain.split_ac my_dom_degoaled op_drive"
 value "ast_domain.split_acs my_dom_degoaled"
 definition "my_dom_split \<equiv> ast_domain.split_dom my_dom_degoaled"

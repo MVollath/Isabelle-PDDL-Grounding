@@ -78,6 +78,32 @@ proof -
   thus ?thesis by auto
 qed
 
+lemma append_r_distinct: "distinct xs \<Longrightarrow> distinct (map (\<lambda>x. x @ p) xs)" (is "?L \<Longrightarrow> ?R")
+proof - (* TODO how to apply contradiction correctly here? *)
+  assume l: ?L
+  {assume "\<not>?R"
+    then obtain i j where
+      ij: "i < length xs" "j < length xs" "i \<noteq> j"
+      "map (\<lambda>x. x @ p) xs ! i = map (\<lambda>x. x @ p) xs ! j"
+      by (metis distinct_conv_nth length_map)
+    hence "xs ! i = xs ! j" by simp
+    hence "\<not>?L" using ij distinct_conv_nth by blast}
+  thus ?thesis using l by auto
+qed
+
+lemma append_l_distinct: "distinct xs \<Longrightarrow> distinct (map ((@)p) xs)" (is "?L \<Longrightarrow> ?R")
+proof - (* TODO how to apply contradiction correctly here? *)
+  assume l: ?L
+  {assume "\<not>?R"
+    then obtain i j where
+      ij: "i < length xs" "j < length xs" "i \<noteq> j"
+      "map ((@)p) xs ! i = map ((@)p) xs ! j"
+      by (metis distinct_conv_nth length_map)
+    hence "xs ! i = xs ! j" by simp    
+    hence "\<not>?L" using ij distinct_conv_nth by blast}
+  thus ?thesis using l by auto
+qed
+
 subsection \<open> Formula Semantics \<close>
 
 lemma entail_and: "A \<TTurnstile> a \<^bold>\<and> b \<longleftrightarrow> A \<TTurnstile> a \<and> A \<TTurnstile> b"
@@ -91,6 +117,27 @@ lemma bigAnd_entailment: "\<Gamma> \<TTurnstile> (\<^bold>\<And>F) \<longleftrig
   unfolding entailment_def
   by auto
 
+text \<open> Single formula entailment, since entailment has a formula set on the left side... \<close>
+
+definition fmla_entailment :: "'a formula \<Rightarrow> 'a formula \<Rightarrow> bool" ("(_ \<TTurnstile>\<^sub>1/ _)" [53,53] 53) where
+  "F \<TTurnstile>\<^sub>1 G \<equiv> \<forall>\<A>. \<A> \<Turnstile> F \<longrightarrow> \<A> \<Turnstile> G"
+
+(*lemma fmla_ent_ent: "F \<TTurnstile>\<^sub>1 G \<Longrightarrow> \<Gamma> \<TTurnstile> F \<Longrightarrow> \<Gamma> \<TTurnstile> G"
+  using fmla_entailment_def entailment_def by metis*)
+
+lemma fmla_ent_ent: "F \<TTurnstile>\<^sub>1 G \<longleftrightarrow> (\<forall>\<Gamma>. \<Gamma> \<TTurnstile> F \<longrightarrow> \<Gamma> \<TTurnstile> G)"
+  apply (rule)
+  using fmla_entailment_def entailment_def apply metis
+  using fmla_entailment_def entailment_def apply fastforce
+  done
+
+text \<open> Other formula properties \<close>
+
+thm atoms_BigAnd
+(* this one isn't in Formulas.thy *)
+lemma atoms_BigOr[simp]: "atoms (\<^bold>\<Or> \<phi>s) = \<Union>(atoms ` set \<phi>s)"
+  by (induction \<phi>s) simp_all
+
 lemma bigAnd_map: "(\<^bold>\<And>(map (map_formula f) \<phi>s)) = map_formula f (\<^bold>\<And>\<phi>s)"
   by (induction \<phi>s; simp_all)
 lemma bigOr_map: "(\<^bold>\<Or>(map (map_formula f) \<phi>s)) = map_formula f (\<^bold>\<Or>\<phi>s)"
@@ -102,22 +149,6 @@ lemma bigAnd_map_atom: "(\<^bold>\<And>(map ((map_formula \<circ> map_atom) f) \
 lemma bigOr_map_atom: "(\<^bold>\<Or>(map ((map_formula \<circ> map_atom) f) \<phi>s)) =
   (map_formula \<circ> map_atom) f (\<^bold>\<Or>\<phi>s)"
   using bigOr_map by auto
-
-lemma bigAnd_atoms: "atoms (\<^bold>\<And> \<phi>s) = \<Union>(atoms ` set \<phi>s)"
-  by (induction \<phi>s) simp_all
-
-lemma bigOr_atoms: "atoms (\<^bold>\<Or> \<phi>s) = \<Union>(atoms ` set \<phi>s)"
-  by (induction \<phi>s) simp_all
-
-text \<open> Single formula entailment, since entailment has a formula set on the left side... \<close>
-
-definition fmla_entailment :: "'a formula \<Rightarrow> 'a formula \<Rightarrow> bool" ("(_ \<TTurnstile>\<^sub>1/ _)" [53,53] 53) where
-  "F \<TTurnstile>\<^sub>1 G \<equiv> \<forall>\<A>. \<A> \<Turnstile> F \<longrightarrow> \<A> \<Turnstile> G"
-
-lemma fmla_ent_ent: "F \<TTurnstile>\<^sub>1 G \<Longrightarrow> \<Gamma> \<TTurnstile> F \<Longrightarrow> \<Gamma> \<TTurnstile> G"
-  using fmla_entailment_def entailment_def by metis
-
-text \<open> Other formula properties \<close>
 
 lemma map_formula_bigOr: "(\<^bold>\<Or> (map (map_formula f) \<phi>s)) = map_formula f (\<^bold>\<Or> \<phi>s)"
   by (induction \<phi>s; simp_all)

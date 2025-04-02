@@ -60,6 +60,9 @@ text \<open>Alternative definitions. Most of these just remove pattern matching
 abbreviation "map_atom_fmla \<equiv> map_formula \<circ> map_atom"
 
 context ast_domain begin
+lemma wf_fmla_alt: "wf_fmla tyt \<phi> = (\<forall>a\<in>atoms \<phi>. wf_atom tyt a)"
+      by (induction \<phi>) auto
+
 (* unnecessary? *)
 lemma apply_effect_alt: "apply_effect \<epsilon> s = (s - set (dels \<epsilon>)) \<union> (set (adds \<epsilon>))"
   by (cases \<epsilon>; simp_all)
