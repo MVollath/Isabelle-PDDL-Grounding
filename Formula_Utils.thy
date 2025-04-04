@@ -24,55 +24,6 @@ next
   qed simp_all
 qed simp_all
 
-(* Like formula.And but it preserves the conjunct being a right-deep tree. *)
-fun conjAnd :: "'a formula \<Rightarrow> 'a formula \<Rightarrow> 'a formula" where
-  "conjAnd \<bottom> B = \<bottom> \<^bold>\<and> B" |
-  "conjAnd (\<^bold>\<not> \<bottom>) B = (\<^bold>\<not> \<bottom>) \<^bold>\<and> B" |
-  "conjAnd (Atom a) B = (Atom a) \<^bold>\<and> B" |
-  "conjAnd (\<^bold>\<not> (Atom a)) B = (\<^bold>\<not> (Atom a)) \<^bold>\<and> B" |
-  "conjAnd (A1 \<^bold>\<and> A2) B = A1 \<^bold>\<and> conjAnd A2 B" |
-  "conjAnd A B = A \<^bold>\<and> B"
-
-text \<open> I struggle to correctly apply (induction ... rule: conjAnd.induct), so the following lemma
-  helps to simplify it:\<close>
-thm conjAnd.induct[of "\<lambda>x y. is_conj x \<and> is_conj y \<longrightarrow> is_conj (conjAnd x y)"]
-lemma conjAnd_induct_isconj:
-  fixes Q :: "'a formula \<Rightarrow> 'a formula \<Rightarrow> bool"
-  assumes "is_conj A \<and> is_conj B"
-  shows "(\<And>B. is_conj B \<Longrightarrow> Q \<bottom> B) \<Longrightarrow>
-    (\<And>B. is_conj B \<Longrightarrow> Q (\<^bold>\<not> \<bottom>) B) \<Longrightarrow>
-    (\<And>a B. is_conj B \<Longrightarrow> Q (Atom a) B) \<Longrightarrow>
-    (\<And>a B. is_conj B \<Longrightarrow> Q (\<^bold>\<not> (Atom a)) B) \<Longrightarrow>
-    (\<And>A1 A2 B.
-      (is_conj A2 \<Longrightarrow> is_conj B \<Longrightarrow> Q A2 B) \<Longrightarrow>
-      (is_lit_plus A1 \<Longrightarrow> is_conj A2 \<Longrightarrow> is_conj B \<Longrightarrow> Q (A1 \<^bold>\<and> A2) B)) \<Longrightarrow>
-    Q A B"
-proof -
-  (* can't I reference this differently? *)
-  assume assm: "\<And>B. is_conj B \<Longrightarrow> Q \<bottom> B"
-    "\<And>B. is_conj B \<Longrightarrow> Q (\<^bold>\<not> \<bottom>) B"
-    "\<And>a B. is_conj B \<Longrightarrow> Q (Atom a) B"
-    "\<And>a B. is_conj B \<Longrightarrow> Q (\<^bold>\<not> (Atom a)) B"
-    "\<And>A1 A2 B.
-      (is_conj A2 \<Longrightarrow> is_conj B \<Longrightarrow> Q A2 B) \<Longrightarrow>
-      (is_lit_plus A1 \<Longrightarrow> is_conj A2 \<Longrightarrow> is_conj B \<Longrightarrow> Q (A1 \<^bold>\<and> A2) B)"
-  have "is_conj A \<and> is_conj B \<longrightarrow> Q A B"
-    apply (rule conjAnd.induct)
-    using assm by simp_all
-  with assms show ?thesis by simp
-qed
-
-lemma conjAnd_is_conj:
-  assumes "is_conj A \<and> is_conj B" shows "is_conj (conjAnd A B)"
-  by (induction A B rule: conjAnd_induct_isconj) (simp_all add: assms)
-  (*by (rule conjAnd.induct[of "\<lambda>x y. is_conj x \<and> is_conj y \<longrightarrow> is_conj (conjAnd x y)"])
-    simp_all*)
-
-lemma conjAnd_sem:
-  "\<A> \<Turnstile> conjAnd F G \<longleftrightarrow> \<A> \<Turnstile> F \<^bold>\<and> G"
-  by (rule conjAnd.induct[of "\<lambda> F G. \<A> \<Turnstile> conjAnd F G \<longleftrightarrow> \<A> \<Turnstile> F \<^bold>\<and> G"])
-    simp_all
-
 subsection \<open> Formula Semantics \<close>
 
 lemma entail_and: "A \<TTurnstile> a \<^bold>\<and> b \<longleftrightarrow> A \<TTurnstile> a \<and> A \<TTurnstile> b"
@@ -90,9 +41,6 @@ text \<open> Single formula entailment, since entailment has a formula set on th
 
 definition fmla_entailment :: "'a formula \<Rightarrow> 'a formula \<Rightarrow> bool" ("(_ \<TTurnstile>\<^sub>1/ _)" [53,53] 53) where
   "F \<TTurnstile>\<^sub>1 G \<equiv> \<forall>\<A>. \<A> \<Turnstile> F \<longrightarrow> \<A> \<Turnstile> G"
-
-(*lemma fmla_ent_ent: "F \<TTurnstile>\<^sub>1 G \<Longrightarrow> \<Gamma> \<TTurnstile> F \<Longrightarrow> \<Gamma> \<TTurnstile> G"
-  using fmla_entailment_def entailment_def by metis*)
 
 lemma fmla_ent_ent: "F \<TTurnstile>\<^sub>1 G \<longleftrightarrow> (\<forall>\<Gamma>. \<Gamma> \<TTurnstile> F \<longrightarrow> \<Gamma> \<TTurnstile> G)"
   apply (rule)

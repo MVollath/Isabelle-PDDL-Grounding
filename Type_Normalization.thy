@@ -1309,7 +1309,7 @@ proof -
     (* putting it together *)
     from entail_L entail_R have entail_map2:
       "s \<union> sf_substate \<^sup>c\<TTurnstile>\<^sub>= ?pre_map2 ((param_precond (ac_params ac)) \<^bold>\<and> (ac_pre ac))"
-      unfolding entailment_def using premaps by simp
+      using entail_and premaps by auto
     hence entail2: "s \<union> sf_substate \<^sup>c\<TTurnstile>\<^sub>= precondition (p2.resolve_instantiate ?pi)"
       using entail_map2 res2 by (simp add: p2.instantiate_action_schema_alt)
     with wf2 have "p2.plan_action_enabled ?pi (s \<union> sf_substate)"
@@ -1339,7 +1339,7 @@ proof -
     hence entail2: "s \<union> sf_substate \<^sup>c\<TTurnstile>\<^sub>= ?pre_map (param_precond (ac_params ac)) \<^bold>\<and> ?pre_map (ac_pre ac)"
       using premaps by force
     hence entail_a: "s \<union> sf_substate \<^sup>c\<TTurnstile>\<^sub>= ?pre_map (ac_pre ac)"
-      using entailment_def entail_and by blast
+      using entail_and by blast
     (* Since sf_substate doesn't interfere with the precondition,
        we can remove it from init here and still satisfy it. *)
     from ac_in have wf_ac: "wf_action_schema ac" using wf_D(7) by simp
@@ -1492,8 +1492,9 @@ proof -
   (* if problem: super_facts_wf might need wf_wm_def *)
   from assms show "\<forall>x t. type_atom x t \<in> M \<longleftrightarrow> type_atom x t \<in> sf_substate"
     using wf_wm_no_typeatms by force
-  from assms show "wf_world_model (M - sf_substate)"
-    by (metis (no_types, lifting) Diff_cancel Int_left_commute Un_Diff Un_Diff_Int Un_Int_eq(4) inf_sup_absorb sf_disj_wf_wm)
+  from assms obtain s where "states_match s M" by blast
+  thus "wf_world_model (M - sf_substate)"
+    using wf_world_model_def by auto
 qed
 
 lemma rp_init: "RP p2.I"

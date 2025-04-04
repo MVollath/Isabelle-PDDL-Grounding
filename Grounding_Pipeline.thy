@@ -86,10 +86,8 @@ lemma prec_norm_preserves_goal_conj:
   "is_conj (goal P) \<Longrightarrow> is_conj (goal split_prob)"
   unfolding split_prob_sel .
 
-text \<open> Due to my implementation of is_conj and type-normed action preconditions,
-  type normalization does not preserve precondition normalization.
-  E.g: (is_Car (x) \<and> is_Road (y)) \<and> (at (x, z) \<and> at (w, z)) is not a right deep tree. \<close>
-(* TODO use conjAnd in type normalization*)
+text \<open> Due to Either-types, type normalization can introduce disjunctions into preconditions,
+  and it can thus potentially break precondition normalization. \<close>
 
 text \<open> Goal normalization only preserves precondition normalization if the goal is a
   pure conjunction.\<close>
