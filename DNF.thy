@@ -6,14 +6,12 @@ imports
     "Propositional_Proof_Systems.CNF_Formulas_Sema"
     "Verified_SAT_Based_AI_Planning.CNF_Supplement"
     "Verified_SAT_Based_AI_Planning.CNF_Semantics_Supplement"
-    Utils
+    Formula_Utils
 begin
 
 subsection \<open>DNF construction\<close>
 
-fun is_conj where
-  "is_conj (F \<^bold>\<and> G) \<longleftrightarrow> is_lit_plus F \<and> is_conj G" |
-  "is_conj H \<longleftrightarrow> is_lit_plus H"
+
 
 fun is_dnf where
   "is_dnf (F \<^bold>\<or> G) \<longleftrightarrow> is_dnf F \<and> is_dnf G" |
@@ -150,7 +148,7 @@ lemma cnf_form_atoms:
 lemma neg_of_lit_atoms: "atoms (neg_of_lit l) = atoms (form_of_lit l)"
   by (cases l) simp_all
 
-(* TODO clarify *)
+(* TODO simplify proof *)
 lemma dnf_list_atoms:
   "\<forall>c \<in> set (dnf_list F). atoms c \<subseteq> atoms F"
 proof -

@@ -1,7 +1,7 @@
 theory Type_Normalization
   imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
     PDDL_Sema_Supplement PDDL_Instance_Relationships
-    Utils Graph_Funs String_Shenanigans
+    Formula_Utils Graph_Funs String_Shenanigans
 begin
 
 subsection \<open> Input Restriction \<close>
@@ -118,13 +118,13 @@ definition (in ast_problem) detype_prob :: "ast_problem" where
 
 (*
 - type hierarchy is empty (implicitly includes ''object'')
-- predicate argument types are Either [''object''].
-  - If the input problem is well-formed, this is superfluous and follows from types = []
-- const types are Either [''object'']
-  - also sort of superfluous. If well-formed, they can only be [''object'', ''object'', ...]
+- Everything else is Either [''object''].
+  This is a little superfluous: If well-formed, they can only be [''object'', ''object'', ...],
     which is semantically equivalent to [''object'']
-- actions parameters are detyped
-  - only not superfluous because wf_action_schema does not ensure well-formed param types. *)
+  - predicate argument types are Either [''object''].
+  - const types are Either [''object'']
+  - actions parameters are detyped
+    This isn't superfluous because wf_action_schema does not ensure well-formed param types. *)
 definition (in ast_domain) typeless_dom :: "bool" where
   "typeless_dom \<equiv>
     types D = []

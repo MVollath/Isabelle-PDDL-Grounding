@@ -46,10 +46,10 @@ fun restore_pa_split where
   "restore_pa_split (PAction n args) = PAction (drop prefix_padding n) args"
 abbreviation "restore_plan_split \<pi>s \<equiv> map restore_pa_split \<pi>s"
 
-definition (in ast_domain) "precond_normed_dom \<equiv>
+definition (in ast_domain) "prec_normed_dom \<equiv>
   \<forall>ac \<in> set (actions D). is_conj (ac_pre ac)"
 
-definition (in ast_problem) "precond_normed_prob \<equiv> precond_normed_dom"
+abbreviation (in ast_problem) "prec_normed_prob \<equiv> prec_normed_dom"
 
 end
 
@@ -160,9 +160,14 @@ qed
 
 subsection \<open> Output format \<close>
 
-lemma (in ast_problem4) prec_normed_ac:
+theorem (in ast_problem4) prec_normed_ac:
   "\<forall>ac' \<in> set (split_ac ac). is_conj (ac_pre ac')"
   using split_ac_sel(3) dnf_list_conjs by auto
+
+theorem (in ast_problem4) prec_normed_prob:
+  "ast_problem.prec_normed_prob P4"
+  unfolding ast_domain.prec_normed_dom_def split_prob_sel split_dom_sel split_acs_def
+  using prec_normed_ac by simp
 
 subsection \<open> Well-formedness \<close>
 
@@ -351,23 +356,23 @@ proof
   thus "d4.wf_action_schema a'" using a(1) wf_D by simp
 qed
 
-theorem (in wf_ast_domain4) p_dom_wf: "d4.wf_domain"
+theorem (in wf_ast_domain4) split_dom_wf: "d4.wf_domain"
   unfolding d4.wf_domain_def split_dom_sel
   unfolding p_wf_type p_wf_pred_decl
   using wf_D split_ac_names_dist p_actions_wf ast_domain.wf_types_def by simp_all
 
-theorem (in wf_ast_problem4) p_prob_wf: "p4.wf_problem"
+theorem (in wf_ast_problem4) split_prob_wf: "p4.wf_problem"
   unfolding p4.wf_problem_def split_prob_sel
   unfolding p_wf_type p_wf_wm p_wf_fmla p_objT
-  using wf_P p_dom_wf by simp_all
+  using wf_P split_dom_wf by simp_all
 
 end
 
 sublocale wf_ast_domain4 \<subseteq> d4: wf_ast_domain D4
-  using p_dom_wf wf_ast_domain.intro by simp
+  using split_dom_wf wf_ast_domain.intro by simp
 
 sublocale wf_ast_problem4 \<subseteq> p4: wf_ast_problem P4
-  using p_prob_wf wf_ast_problem.intro by simp
+  using split_prob_wf wf_ast_problem.intro by simp
 
 subsection \<open> Semantics \<close>
 
@@ -391,7 +396,7 @@ lemma nnf_map: "map_formula m (nnf F) = nnf (map_formula m F)"
 (* there's gotta be some easier way to prove this *)
 (* I can't overload g in this proof, so I need a second instance g' *)
 lemma lin_prod_map:
-  assumes "\<forall>x y. f (g x y) = g' (f x) (f y)"
+  assumes "\<And>x y. f (g x y) = g' (f x) (f y)"
   shows "map f [g x y. x \<leftarrow> xs, y \<leftarrow> ys] = [g' x y. x \<leftarrow> map f xs, y \<leftarrow> map f ys]"
 proof -
   have aux: "map (\<lambda>x. f (g x)) xs = map f (map g xs)"
@@ -452,7 +457,7 @@ qed
 
 context ast_domain4 begin
 
-lemma dnf_list_cw:
+lemma (in -) dnf_list_cw:
   assumes "wm_basic M"
   shows "M \<^sup>c\<TTurnstile>\<^sub>= F \<longleftrightarrow> (\<exists>c\<in>set (dnf_list F). M \<^sup>c\<TTurnstile>\<^sub>= c)"
   using assms valuation_iff_close_world dnf_list_semantics by blast
@@ -506,7 +511,10 @@ lemma (in ast_problem4) p_exec:
   unfolding instantiate_action_schema_alt apply simp
   unfolding split_ac_sel(2,4)[OF assms(1)] ..
 
-lemma (in wf_ast_problem4) split_pa_enabled:
+end
+context wf_ast_problem4 begin
+
+lemma split_pa_enabled:
   assumes "wm_basic M" "plan_action_enabled \<pi> M"
   shows "\<exists>\<pi>'. p4.plan_action_enabled \<pi>' M \<and> (execute_plan_action \<pi> M = p4.execute_plan_action \<pi>' M)"
 proof (cases \<pi>)
@@ -542,7 +550,7 @@ proof (cases \<pi>)
   thus ?thesis using p_exec a'(1) a(1) res' by auto
 qed
 
-lemma (in wf_ast_problem4) p_valid_plan_from:
+lemma p_valid_plan_from:
   assumes "wf_world_model s" "valid_plan_from s \<pi>s"
   shows "\<exists>\<pi>s'. p4.valid_plan_from s \<pi>s'"
 using assms proof (induction \<pi>s arbitrary: s)
@@ -558,7 +566,7 @@ next
   thus ?case using p4.valid_plan_from_Cons pi'(1) by metis
 qed
 
-lemma restore_split_ac:
+lemma (in ast_domain4) restore_split_ac:
   assumes "a \<in> set (actions D)" "a' \<in> set (split_ac a)"
   shows "drop prefix_padding (ac_name a') = ac_name a"
 proof -
@@ -570,7 +578,7 @@ proof -
     using assms split_names_prefix_length drop_prefix by metis
 qed
 
-lemma (in wf_ast_problem4) restore_pa_enabled:
+lemma restore_pa_enabled:
   assumes "wm_basic M" "p4.plan_action_enabled \<pi>' M"
   defines pi: "\<pi> \<equiv> restore_pa_split \<pi>'"
   shows "plan_action_enabled \<pi> M \<and> (execute_plan_action \<pi> M = p4.execute_plan_action \<pi>' M)"
@@ -606,7 +614,7 @@ proof (cases \<pi>')
   with a(1) a'(1) res show ?thesis using p_exec pi by simp
 qed
 
-lemma (in wf_ast_problem4) restore_plan_split_valid_from:
+lemma restore_plan_split_valid_from:
   assumes "p4.wf_world_model s" "p4.valid_plan_from s \<pi>s'"
   shows "valid_plan_from s (restore_plan_split \<pi>s')"
 using assms proof (induction \<pi>s' arbitrary: s)
@@ -624,13 +632,13 @@ next
   thus ?case using valid_plan_from_Cons p_wf_wm pi(1) by simp
 qed
 
-theorem (in wf_ast_problem4) split_valid_iff:
+theorem split_valid_iff:
   "(\<exists>\<pi>s. valid_plan \<pi>s) \<longleftrightarrow> (\<exists>\<pi>s'. p4.valid_plan \<pi>s')"
   unfolding ast_problem.valid_plan_def
   using restore_plan_split_valid_from p_valid_plan_from
   by (metis I_def p4.I_def p4.wf_I wf_I split_prob_sel(3))
 
-theorem (in wf_ast_problem4) restore_plan_split_valid:
+theorem restore_plan_split_valid:
   "p4.valid_plan \<pi>s' \<Longrightarrow> valid_plan (restore_plan_split \<pi>s')"
   unfolding ast_problem.valid_plan_def
   using restore_plan_split_valid_from p4.wf_I by simp

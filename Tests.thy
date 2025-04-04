@@ -2,7 +2,7 @@ theory Tests
   imports Main
     (*"../LTS-formalization/Datalog/Datalog"*)
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    "Show.Show"
+    "Show.Show" DNF
     (*"AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker" *)
 begin
 

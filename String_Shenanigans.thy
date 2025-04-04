@@ -2,18 +2,18 @@ theory String_Shenanigans
 imports Main "Show.Show_Instances" "HOL-Library.Sublist"
 begin
 
-fun max_length :: "'a list list \<Rightarrow> nat" where
-  "max_length [] = 0" | (* yeah, yeah, technically it should be -1 or None/undefined or something *)
-  "max_length (xs # xss) = max (length xs) (max_length xss)"
-
-lemma max_length_correct: "\<forall>s \<in> set ss. length s \<le> max_length ss"
-  by (induction ss) auto
+abbreviation max_length :: "'a list list \<Rightarrow> nat" where
+  "max_length xss \<equiv> Max (length ` set xss)"
 
 definition safe_prefix :: "string list \<Rightarrow> string" where
-  "safe_prefix xs \<equiv> replicate (max_length xs + 1) (CHR ''_'')"
+  "safe_prefix ss \<equiv> replicate (max_length ss + 1) (CHR ''_'')"
 
 lemma safe_prefix_correct: "safe_prefix xs @ x \<notin> set xs"
-  using max_length_correct safe_prefix_def by force
+proof -
+  have "\<forall>s \<in> set ss. length s \<le> max_length ss" for ss :: "string list"
+    by simp
+  thus ?thesis using safe_prefix_def by fastforce
+qed
 
 lemma dist_prefix: "distinct xs \<Longrightarrow> distinct (map ((@) (safe_prefix ys)) xs)"
   by (simp add: distinct_conv_nth)
@@ -100,10 +100,12 @@ definition make_unique :: "string list \<Rightarrow> string \<Rightarrow> string
 
 lemma made_unique: "make_unique ss x \<notin> set ss"
 proof -
-  have "max_length ss + 1 \<le> length (make_unique ss x)"
+  have "\<forall>s \<in> set ss. length s \<le> max_length ss"
+    by simp
+  moreover have "max_length ss + 1 \<le> length (make_unique ss x)"
     using make_unique_def pad_length(2) by simp
-  hence "\<forall>s \<in> set ss. length s < length (make_unique ss x)"
-    using max_length_correct by fastforce
+  ultimately have "\<forall>s \<in> set ss. length s < length (make_unique ss x)"
+    by (meson add_le_mono1 le_trans less_iff_succ_less_eq)
   thus ?thesis by auto
 qed
 
