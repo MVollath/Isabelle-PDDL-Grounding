@@ -98,6 +98,7 @@ lemma (in -) set_n_pre_mapsel:
     "map ac_name (map2 (set_n_pre ac) ns pres) = ns"
     (*"map ac_params (map2 (set_n_pre ac) ns pres) = replicate (n_clauses ac) (ac_params ac)" *)
     "map ac_pre (map2 (set_n_pre ac) ns pres) = pres"
+    (*"map ac_eff (map2 (set_n_pre ac) ns pres) = replicate (n_clauses ac) (ac_eff ac)" *)
 using assms by (induction ns pres rule: list_induct2) simp_all
 
 lemma (in ast_domain) split_dom_sel [simp]:
@@ -136,11 +137,8 @@ lemma (in ast_domain4) p_ac:
   unfolding split_dom_sel split_acs_def by simp
 
 lemma (in ast_domain) split_pres: "map ac_pre (split_ac a) = dnf_list (ac_pre a)"
-    unfolding split_ac_def Let_def apply (rule set_n_pre_mapsel)
-    unfolding split_ac_names_def n_clauses_def by simp
-
-(* "ac_params a' = ac_params a" "ac_eff a' = ac_eff a" if "a' \<in> set (split_ac a)" *)
-
+  unfolding split_ac_def Let_def apply (rule set_n_pre_mapsel)
+  unfolding split_ac_names_def n_clauses_def by simp
 
 lemma (in ast_domain) split_ac_sel:
   assumes "a' \<in> set (split_ac a)"
@@ -218,6 +216,9 @@ lemma (in ast_problem4) p_wf_wm: "p4.wf_world_model = wf_world_model"
   unfolding ast_problem.wf_world_model_def ast_domain.wf_fmla_atom_alt
   using p_wf_fmla p_objT split_prob_sel(1) by metis
 
+lemma (in ast_problem4) p_is_obj_of_type: "p4.is_obj_of_type = is_obj_of_type"
+  unfolding ast_problem.is_obj_of_type_def p_objT split_prob_sel p_of_type ..
+
 end
 context wf_ast_domain4 begin
 
@@ -293,10 +294,11 @@ proof -
 qed
 
 lemma (in wf_ast_domain) split_names_disjoint2:
-  assumes "xs \<in> set (map split_ac_names (actions D))"
-          "ys \<in> set (map split_ac_names (actions D))"
-          "xs \<noteq> ys"
-        shows "set xs \<inter> set ys = {}"
+  assumes
+    "xs \<in> set (map split_ac_names (actions D))"
+    "ys \<in> set (map split_ac_names (actions D))"
+    "xs \<noteq> ys"
+  shows "set xs \<inter> set ys = {}"
 proof -
   from assms obtain x y where
     xy: "xs = split_ac_names x"  "x \<in> set (actions D)"
@@ -361,58 +363,62 @@ theorem (in wf_ast_problem4) p_prob_wf: "p4.wf_problem"
 
 end
 
+sublocale wf_ast_domain4 \<subseteq> d4: wf_ast_domain D4
+  using p_dom_wf wf_ast_domain.intro by simp
+
+sublocale wf_ast_problem4 \<subseteq> p4: wf_ast_problem P4
+  using p_prob_wf wf_ast_problem.intro by simp
+
 subsection \<open> Semantics \<close>
-
-context wf_ast_problem4 begin
-
-lemma dnf_list_cw:
-  assumes "wm_basic M"
-  shows "M \<^sup>c\<TTurnstile>\<^sub>= F \<longleftrightarrow> (\<exists>c\<in>set (dnf_list F). M \<^sup>c\<TTurnstile>\<^sub>= c)"
-  using assms valuation_iff_close_world dnf_list_semantics by blast
 
 text \<open> Applying a map to dnf_list \<close>
 
-lemma (in -) neg_of_lit_map: "map_formula m (neg_of_lit l) = neg_of_lit (map_literal m l)"
+lemma neg_of_lit_map: "map_formula m (neg_of_lit l) = neg_of_lit (map_literal m l)"
   by (cases l) simp_all
 
-lemma (in -) neg_conj_of_clause_map: "map_formula m (neg_conj_of_clause c)
+lemma neg_conj_of_clause_map: "map_formula m (neg_conj_of_clause c)
   = neg_conj_of_clause (map (map_literal m) c)"
   unfolding neg_conj_of_clause_def
   apply (induction c) apply simp using neg_of_lit_map by auto
   
-lemma (in -) neg_conj_of_clause_map2: "map ((map_formula m) \<circ> neg_conj_of_clause) D
+lemma neg_conj_of_clause_map2: "map ((map_formula m) \<circ> neg_conj_of_clause) D
   = map neg_conj_of_clause (map (map (map_literal m)) D)"
   using neg_conj_of_clause_map by auto
 
-lemma (in -) nnf_map: "map_formula m (nnf F) = nnf (map_formula m F)"
+lemma nnf_map: "map_formula m (nnf F) = nnf (map_formula m F)"
   by (induction F rule: nnf.induct) auto
 
 (* there's gotta be some easier way to prove this *)
-(* this works for all g where "f (g x y) = g (f x) (f y)" *)
-lemma (in -) append_prod_map:
-  "map (map f) [x @ y. x \<leftarrow> xs, y \<leftarrow> ys] = [x @ y. x \<leftarrow> map (map f) xs, y \<leftarrow> map (map f) ys]"
+(* I can't overload g in this proof, so I need a second instance g' *)
+lemma lin_prod_map:
+  assumes "\<forall>x y. f (g x y) = g' (f x) (f y)"
+  shows "map f [g x y. x \<leftarrow> xs, y \<leftarrow> ys] = [g' x y. x \<leftarrow> map f xs, y \<leftarrow> map f ys]"
 proof -
-  define m where "m = map f"
-  have aux: "map (\<lambda>x. f (g x)) xs = map f (map g xs)" for f g xs by simp
+  have aux: "map (\<lambda>x. f (g x)) xs = map f (map g xs)"
+    for g :: "'a \<Rightarrow> 'b" and f :: "'b \<Rightarrow> 'c" and xs :: "'a list" by simp
 
-  (* "map f [x @ y. x \<leftarrow> xs, y \<leftarrow> ys] = map f (concat (map (\<lambda>x. map ((@) x) ys) xs))" *)
-  have "map m [x @ y. x \<leftarrow> xs, y \<leftarrow> ys] = (concat (map (map m) (map (\<lambda>x. map ((@) x) ys) xs)))"
+  (* "map f [g x y. x \<leftarrow> xs, y \<leftarrow> ys] = map f (concat (map (\<lambda>x. map (g x) ys) xs))" *)
+  have "map f [g x y. x \<leftarrow> xs, y \<leftarrow> ys] = (concat (map (map f) (map (\<lambda>x. map (g x) ys) xs)))"
     using map_concat by blast
-  also have "... = concat (map ((map m) \<circ> (\<lambda>x. map ((@) x) ys)) xs)" by simp
-  also have "... = concat (map (\<lambda>x. map m (map ((@) x) ys)) xs)" by (meson comp_apply)
-  also have "... = concat (map (\<lambda>x. map (m \<circ> ((@) x)) ys) xs)" by simp
-  also have "... = concat (map (\<lambda>x. map (\<lambda>y. m (x @ y)) ys) xs)"
-    by (metis fun_comp_eq_conv[of m])
-  also have "... = concat (map (\<lambda>x. map (\<lambda>y. m x @ m y) ys) xs)"
-    unfolding m_def by simp
-  also have "... = concat (map (\<lambda>x. map (\<lambda>y. m x @ y) (map m ys)) xs)"
+  also have "... = concat (map ((map f) \<circ> (\<lambda>x. map (g x) ys)) xs)" by simp
+  also have "... = concat (map (\<lambda>x. map f (map (g x) ys)) xs)" by (meson comp_apply)
+  also have "... = concat (map (\<lambda>x. map (f \<circ> (g x)) ys) xs)" by simp
+  also have "... = concat (map (\<lambda>x. map (\<lambda>y. f (g x y)) ys) xs)"
+    by (metis fun_comp_eq_conv[of f])
+  also have "... = concat (map (\<lambda>x. map (\<lambda>y. g' (f x) (f y)) ys) xs)"
+    using assms by simp
+  also have "... = concat (map (\<lambda>x. map (\<lambda>y. g' (f x) y) (map f ys)) xs)"
     using aux by metis
-  also have "... = concat (map (\<lambda>x. map (\<lambda>y. x @ y) (map m ys)) (map m xs))"
-    using aux[of "(\<lambda>x. map (\<lambda>y. x @ y) (map m ys))"] by metis
-  finally show ?thesis unfolding m_def by simp
+  also have "... = concat (map (\<lambda>x. map (\<lambda>y. g' x y) (map f ys)) (map f xs))"
+    using aux[of "(\<lambda>x. map (\<lambda>y. g' x y) (map f ys))"] by metis
+  finally show ?thesis by simp
 qed
 
-lemma (in -) cnf_lists_map:
+lemma append_prod_map:
+  shows "map (map f) [x @ y. x \<leftarrow> xss, y \<leftarrow> yss] = [x @ y. x \<leftarrow> map (map f) xss, y \<leftarrow> map (map f) yss]"
+  by (rule lin_prod_map) simp
+
+lemma cnf_lists_map:
   assumes "is_nnf F"
   shows "map (map (map_literal m)) (cnf_lists F) = cnf_lists (map_formula m F)"
   using assms proof (induction F rule: cnf_lists.induct)
@@ -444,61 +450,119 @@ qed
 
 (* end map *)
 
-term ac_tsubst
-term resolve_instantiate
-term instantiate_action_schema
-term map_atom_fmla
+context ast_domain4 begin
 
-lemma
-  "A \<Turnstile> ac_pre a \<longleftrightarrow> (\<exists>a' \<in> set (split_ac a). A \<Turnstile> ac_pre a')"
+lemma dnf_list_cw:
+  assumes "wm_basic M"
+  shows "M \<^sup>c\<TTurnstile>\<^sub>= F \<longleftrightarrow> (\<exists>c\<in>set (dnf_list F). M \<^sup>c\<TTurnstile>\<^sub>= c)"
+  using assms valuation_iff_close_world dnf_list_semantics by blast
+
+lemma precond_prop_iff_split:
+  "(\<exists>c \<in> set (dnf_list (ac_pre a)). P c) \<longleftrightarrow> (\<exists>a' \<in> set (split_ac a). P (ac_pre a'))"
 proof -
   let ?dnf = "dnf_list (ac_pre a)"
-  have "A \<Turnstile> ac_pre a \<longleftrightarrow> (\<exists>p' \<in> set ?dnf. A \<Turnstile> p')"
-    using dnf_list_semantics by blast
-  also have "... \<longleftrightarrow> (\<exists>i < length ?dnf. A \<Turnstile> ?dnf ! i)"
+  have "(\<exists>c \<in> set ?dnf. P c) \<longleftrightarrow> (\<exists>i < length ?dnf. P (?dnf ! i))"
     using in_set_conv_nth by metis
-  also have "... \<longleftrightarrow> (\<exists>i < length ?dnf. A \<Turnstile> ac_pre (split_ac a ! i))"
+  also have "... \<longleftrightarrow> (\<exists>i < length ?dnf. P (ac_pre (split_ac a ! i)))"
     using split_ac_nth by auto
-  also have "... \<longleftrightarrow> (\<exists>a' \<in> set (split_ac a). A \<Turnstile> ac_pre a')"
+  also have "... \<longleftrightarrow> (\<exists>a' \<in> set (split_ac a). P (ac_pre a'))"
     using in_set_conv_nth split_ac_len by metis
   finally show ?thesis by simp
 qed
 
-lemma
+lemma inst_pre_iff_split:
   assumes "wm_basic M"
   shows "M \<^sup>c\<TTurnstile>\<^sub>= precondition (instantiate_action_schema a args) \<longleftrightarrow>
-    (\<exists>a' \<in> set (split_ac a). M \<^sup>c\<TTurnstile>\<^sub>= precondition (instantiate_action_schema a' args))"
+    (\<exists>a' \<in> set (split_ac a). M \<^sup>c\<TTurnstile>\<^sub>= precondition (d4.instantiate_action_schema a' args))"
 proof -
-  oops  
+  let ?inst_fmla = "map_atom_fmla (ac_tsubst (ac_params a) args)"
+  have "M \<^sup>c\<TTurnstile>\<^sub>= precondition (instantiate_action_schema a args) \<longleftrightarrow>
+    M \<^sup>c\<TTurnstile>\<^sub>= ?inst_fmla (ac_pre a)"
+    using instantiate_action_schema_alt by simp
+  also have "... \<longleftrightarrow> (\<exists>c \<in> set (dnf_list (?inst_fmla (ac_pre a))). M \<^sup>c\<TTurnstile>\<^sub>= c)"
+    using dnf_list_cw[OF assms] by metis
+  also have "... \<longleftrightarrow> (\<exists>c \<in> set (map ?inst_fmla (dnf_list (ac_pre a))). M \<^sup>c\<TTurnstile>\<^sub>= c)"
+    using dnf_list_map[of "map_atom (ac_tsubst (ac_params a) args)"] by auto
+  also have "... \<longleftrightarrow> (\<exists>c \<in> set (dnf_list (ac_pre a)). M \<^sup>c\<TTurnstile>\<^sub>= ?inst_fmla c)"
+    by simp
+  also have "... \<longleftrightarrow> (\<exists>a' \<in> set (split_ac a). M \<^sup>c\<TTurnstile>\<^sub>= ?inst_fmla (ac_pre a'))"
+    using precond_prop_iff_split by simp
+  also have "... \<longleftrightarrow> (\<exists>a' \<in> set (split_ac a). M \<^sup>c\<TTurnstile>\<^sub>= precondition (instantiate_action_schema a' args))"
+    using instantiate_action_schema_alt split_ac_sel by simp
+  finally show ?thesis by simp
+qed
 
-lemma "a \<in> set (actions D) \<Longrightarrow> \<exists>n. resolve_action_schema n = Some a"
-  by (simp add: res_aux)
+lemma (in ast_problem4) p_ac_params_match:
+  assumes "a' \<in> set (split_ac a)"
+  shows "action_params_match a = p4.action_params_match a'"
+  unfolding ast_problem.action_params_match_def p_is_obj_of_type split_ac_sel(2)[OF assms] ..
 
+lemma (in ast_problem4) p_exec:
+  assumes "a' \<in> set (split_ac a)"
+    "resolve_action_schema n = Some a" "d4.resolve_action_schema n' = Some a'"
+  shows "execute_plan_action (PAction n args) = p4.execute_plan_action (PAction n' args)"
+  unfolding ast_problem.execute_plan_action_def ast_problem.resolve_instantiate.simps
+  using assms(2,3) apply simp
+  unfolding instantiate_action_schema_alt apply simp
+  unfolding split_ac_sel(2,4)[OF assms(1)] ..
 
-(* TODO move to Utils *)
-(* kind of useless, saves a a line or two sometimes *)
-lemma (in -) list_induct_n:
-  assumes "length xs = n" "P [] 0"
-  "\<And>x xs n. length xs = n \<Longrightarrow>
-  P xs n \<Longrightarrow> P (x # xs) (Suc n)" shows "P xs n"
-using assms proof (induction xs arbitrary: n)
-  case (Cons x xs n)
-  thus ?case by (cases n) simp_all
-qed simp
+lemma (in wf_ast_problem4) split_pa_enabled:
+  assumes "wm_basic M" "plan_action_enabled \<pi> M"
+  shows "\<exists>\<pi>'. p4.plan_action_enabled \<pi>' M \<and> (execute_plan_action \<pi> M = p4.execute_plan_action \<pi>' M)"
+proof (cases \<pi>)
+  case [simp]: (PAction n args)
 
-(* TODO move to Utils *)
-lemma (in -) drop_prefix:
-  assumes "length xs = n" shows "drop n (xs @ ys) = ys"
-  by (induction rule: list_induct_n[OF assms]) simp_all
+  from assms(2) obtain a where a: "resolve_action_schema n = Some a" "action_params_match a args"
+    "a \<in> set (actions D)"
+    unfolding plan_action_enabled_def using wf_pa_refs_ac by force
+  from assms obtain a' where a': "a' \<in> set (split_ac a)"
+    "M \<^sup>c\<TTurnstile>\<^sub>= precondition (d4.instantiate_action_schema a' args)"
+    unfolding plan_action_enabled_def
+    using inst_pre_iff_split PAction by (metis a(1) resolve_instantiate.simps option.sel)
+  
+  let ?pi = "PAction n args"
+  let ?pi' = "PAction (ac_name a') args"
+
+  (* precondition satisfied *)
+  from a'(1) have "a' \<in> set (actions D4)" using a(3) split_dom_sel(4)
+    unfolding split_acs_def by auto
+  hence res': "d4.resolve_action_schema (ac_name a') = Some a'"
+    using d4.res_aux by simp
+  with a'(2) have sat': "M \<^sup>c\<TTurnstile>\<^sub>= precondition (p4.resolve_instantiate ?pi')"
+    by simp
+
+  (* well-formed *)
+  have "p4.action_params_match a' args"
+    using a'(1) a(2) p_ac_params_match by simp
+  with res' have wf': "p4.wf_plan_action ?pi'"
+    using p4.wf_plan_action_simple by fastforce
+
+  from wf' sat' have enab': "p4.plan_action_enabled ?pi' M"
+    using p4.plan_action_enabled_def by simp
+  thus ?thesis using p_exec a'(1) a(1) res' by auto
+qed
+
+lemma (in wf_ast_problem4) p_valid_plan_from:
+  assumes "wf_world_model s" "valid_plan_from s \<pi>s"
+  shows "\<exists>\<pi>s'. p4.valid_plan_from s \<pi>s'"
+using assms proof (induction \<pi>s arbitrary: s)
+  case Nil thus ?case
+    unfolding ast_problem.valid_plan_def ast_problem.valid_plan_from_def split_prob_sel
+    using ast_problem.plan_action_path_Nil by metis
+next
+  case (Cons \<pi> \<pi>s)
+  then obtain \<pi>' where pi': "p4.plan_action_enabled \<pi>' s" "execute_plan_action \<pi> s = p4.execute_plan_action \<pi>' s"
+    using split_pa_enabled wf_wm_basic valid_plan_from_Cons by blast
+  then obtain \<pi>s' where "p4.valid_plan_from (p4.execute_plan_action \<pi>' s) \<pi>s'"
+    using Cons wf_execute by fastforce
+  thus ?case using p4.valid_plan_from_Cons pi'(1) by metis
+qed
 
 lemma restore_split_ac:
   assumes "a \<in> set (actions D)" "a' \<in> set (split_ac a)"
   shows "drop prefix_padding (ac_name a') = ac_name a"
 proof -
-  (* TODO simplify the start *)
-  from assms obtain i where i: "split_ac a ! i = a'" "i < length (split_ac a)"
-    by (meson in_set_conv_nth)
-  hence "ac_name a' \<in> set (map ac_name (split_ac a))" by auto
+  from assms have "ac_name a' \<in> set (map ac_name (split_ac a))" by auto
   hence "ac_name a' \<in> set (split_ac_names a)"
     unfolding split_ac_def
     using split_ac_len set_n_pre_mapsel by metis
@@ -506,13 +570,72 @@ proof -
     using assms split_names_prefix_length drop_prefix by metis
 qed
 
-thm restore_pa_split.simps
-(*(drop prefix_padding ?n)*)
-thm split_ac_nth
-thm dnf_list_semantics
+lemma (in wf_ast_problem4) restore_pa_enabled:
+  assumes "wm_basic M" "p4.plan_action_enabled \<pi>' M"
+  defines pi: "\<pi> \<equiv> restore_pa_split \<pi>'"
+  shows "plan_action_enabled \<pi> M \<and> (execute_plan_action \<pi> M = p4.execute_plan_action \<pi>' M)"
+proof (cases \<pi>')
+  case [simp]: (PAction n' args)
+  let ?pi' = "PAction n' args"
+  let ?pi = "PAction (drop prefix_padding n') args"
+
+  from assms(2) obtain a' where a': "p4.resolve_action_schema n' = Some a'" "p4.action_params_match a' args"
+    "a' \<in> set (actions D4)" "ac_name a' = n'"
+    unfolding p4.plan_action_enabled_def
+    using split_prob_sel p4.wf_pa_refs_ac by force
+  from assms a'(1,3) obtain a where a: "a' \<in> set (split_ac a)"
+    "M \<^sup>c\<TTurnstile>\<^sub>= precondition (instantiate_action_schema a args)" "a \<in> set (actions D)"
+    unfolding p4.plan_action_enabled_def
+    using PAction by (metis p_ac inst_pre_iff_split p4.resolve_instantiate.simps option.sel)
+
+  (* precondition enabled *)
+  hence "drop prefix_padding (ac_name a') = ac_name a"
+    using restore_split_ac by simp
+  with a(3) have res: "resolve_action_schema (drop prefix_padding n') = Some a"
+    using res_aux a'(4) by simp
+  with a(2) have sat: "M \<^sup>c\<TTurnstile>\<^sub>= precondition (resolve_instantiate ?pi)"
+    by simp
+
+  (* well-formed *)
+  have "action_params_match a args" using a(1) a'(2) p_ac_params_match by simp
+  with res have wf: "wf_plan_action ?pi"
+    using wf_plan_action_simple by fastforce
+
+  from wf sat have enab: "plan_action_enabled ?pi M"
+    using plan_action_enabled_def by simp
+  with a(1) a'(1) res show ?thesis using p_exec pi by simp
+qed
+
+lemma (in wf_ast_problem4) restore_plan_split_valid_from:
+  assumes "p4.wf_world_model s" "p4.valid_plan_from s \<pi>s'"
+  shows "valid_plan_from s (restore_plan_split \<pi>s')"
+using assms proof (induction \<pi>s' arbitrary: s)
+  case Nil thus ?case 
+  unfolding ast_problem.valid_plan_def ast_problem.valid_plan_from_def split_prob_sel list.map(1)
+    using ast_problem.plan_action_path_Nil by metis
+next
+  case (Cons \<pi>' \<pi>s')
+  let ?pi = "restore_pa_split \<pi>'" and ?pis = "restore_plan_split \<pi>s'"
+  from Cons have pi: "plan_action_enabled ?pi s" "execute_plan_action ?pi s = p4.execute_plan_action \<pi>' s"
+    using restore_pa_enabled p4.wf_wm_basic p4.valid_plan_from_Cons wf_wm_basic by simp_all
+
+  from Cons have "valid_plan_from (execute_plan_action ?pi s) ?pis"
+    using p4.wf_execute p4.valid_plan_from_Cons pi(2) by simp
+  thus ?case using valid_plan_from_Cons p_wf_wm pi(1) by simp
+qed
+
+theorem (in wf_ast_problem4) split_valid_iff:
+  "(\<exists>\<pi>s. valid_plan \<pi>s) \<longleftrightarrow> (\<exists>\<pi>s'. p4.valid_plan \<pi>s')"
+  unfolding ast_problem.valid_plan_def
+  using restore_plan_split_valid_from p_valid_plan_from
+  by (metis I_def p4.I_def p4.wf_I wf_I split_prob_sel(3))
+
+theorem (in wf_ast_problem4) restore_plan_split_valid:
+  "p4.valid_plan \<pi>s' \<Longrightarrow> valid_plan (restore_plan_split \<pi>s')"
+  unfolding ast_problem.valid_plan_def
+  using restore_plan_split_valid_from p4.wf_I by simp
 
 end
-
 
 subsection \<open> Code Setup \<close>
 

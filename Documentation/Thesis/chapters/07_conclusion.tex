@@ -1,15 +1,39 @@
 % !TeX root = ../main.tex
-\chapter{Conclusion}
-\warn{\begin{itemize}
-	\item I re-implemented it
-	\item I proved it
-	\item it runs, not fast but it runs
-\end{itemize}}
 
-Outlook:
-\warn{\begin{itemize}
-	\item Allow disjunctions in goal formula!
-	\item support PDDL axioms
-	\item implement invariant synthesis to change output to \SASP
-	\item consider types in datalog translation (Typed Datalog exists)
-\end{itemize}}
+Conclusion
+
+Recap
+	I implemented the grounder by Helmert, including the optimization by Correa, excluding invariant analysis.
+	In contrast to the formalism by Helmert, my implementation supports a more complex type system but not PDDL axioms.
+	The program grounds PDDL tasks into propositional STRIPS and employs reachability analysis to optimize the size of the output.
+	I proved the implementation, which includes a verified re-implementation of a part of lpopt, a system that employs tree decomposition to
+	optimize Datalog programs. The implementation is modular, so every step can be used independently of each other.
+	
+	A major limitation is that external programs are used to solve Datalog and tree-decompose the graph.
+	These form weak points in the proof, and although their results are checked by verified functions,
+		it is in theory possible that these external systems produce invalid output and grounding fails.
+	
+	
+Outlook
+	Eliminate the weak points by implementing a verified solver for Datalog and an algorithm for tree decompositions	
+	Optimize the STRIPS output by removing all static variables, see difference between stripsfull and stripsopti
+		(although eliminating the goal action is a different optimization)
+	Implement invariant synthesis to change the output to SASP, for which a formalization already exists in AbKu
+	Extend PDDL formalism to support axioms and implement the steps described by Helmert to deal with them during grounding.
+	Consider typed datalog, eliminating the need for type normalization
+	
+
+Final words
+In conclusion, this thesis reaffirms the viability of formally verified planning systems and aids future developments of verified analysis of planning tasks.
+
+	
+	
+This thesis has presented the implementation and formal verification of a planning system that translates PDDL tasks into the STRIPS format, utilizing advanced techniques in formal methods and computer science to ensure both the correctness and functionality of the system. The rigorous approach adopted from seminal works in the field was re-implemented with a strong emphasis on adherence to formal specifications and proving the underlying theoretical concepts.
+
+\textbf{Achievements:} \begin{enumerate} \item \textbf{Re-implementation:} The system was meticulously re-implemented according to the Abdulaziz and Lammich's formalization in Isabelle, ensuring that the intricate details of the PDDL and STRIPS specifications were respected and accurately represented. \item \textbf{Formal Proofs:} Throughout the project, formal proofs were developed to verify every aspect of the implementation. This rigorous verification process was essential in confirming that the system not only adheres to its specification but also maintains the logical integrity required for reliable planning. \item \textbf{Operational Status:} Despite the complex nature of the formal methods applied, the resulting system is operational. While it may not boast the highest speeds due to the computational overhead of the formal methods used, its ability to run effectively underlines the practical applicability of formally verified planning systems in real-world scenarios. \end{enumerate}
+
+\textbf{Outlook and Future Work:} Looking forward, there are several exciting avenues for further enhancing the capabilities and performance of this planning system:
+
+\begin{enumerate} \item \textbf{Incorporating Disjunctions in Goals:} Extending the system to allow for disjunctions within goal formulas would align it more closely with real-world planning scenarios, where goals are often not strictly conjunctive. \item \textbf{Support for PDDL Axioms:} Integrating support for PDDL axioms could greatly increase the expressiveness and flexibility of the system, enabling it to handle a wider range of planning tasks with complex logical structures. \item \textbf{Implementing Invariant Synthesis:} The addition of invariant synthesis would facilitate the output of tasks in the \SASP{} format, further broadening the system’s applicability and enhancing its utility in more advanced planning environments. \item \textbf{Typed Datalog:} Exploring the incorporation of types within the Datalog translations—leveraging approaches from Typed Datalog—could provide improvements in performance and accuracy, particularly in complex planning scenarios with intricate type hierarchies. \end{enumerate}
+
+In conclusion, this thesis not only reaffirms the viability of formally verified planning systems but also sets the stage for future developments that could further revolutionize the field. The foundational work done here provides a robust platform for the continued evolution and enhancement of planning systems, paving the way for more sophisticated, reliable, and versatile automated planning solutions.

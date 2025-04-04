@@ -42,6 +42,16 @@ lemma eq_contr: "(a = b \<Longrightarrow> False) \<Longrightarrow> a \<noteq> b"
 
 (* lists *)
 
+(* Saves a a line or two sometimes *)
+lemma list_induct_n:
+  assumes "length xs = n" "P [] 0"
+  "\<And>x xs n. length xs = n \<Longrightarrow>
+  P xs n \<Longrightarrow> P (x # xs) (Suc n)" shows "P xs n"
+using assms proof (induction xs arbitrary: n)
+  case (Cons x xs n)
+  thus ?case by (cases n) simp_all
+qed simp
+
 fun sublist_until :: "'a list \<Rightarrow> 'a \<Rightarrow> 'a list" where
   "sublist_until [] a = []" |
   "sublist_until (x # xs) a =
@@ -103,6 +113,10 @@ proof - (* TODO how to apply contradiction correctly here? *)
     hence "\<not>?L" using ij distinct_conv_nth by blast}
   thus ?thesis using l by auto
 qed
+
+lemma drop_prefix:
+  assumes "length xs = n" shows "drop n (xs @ ys) = ys"
+  by (induction rule: list_induct_n[OF assms]) simp_all
 
 subsection \<open> Formula Semantics \<close>
 

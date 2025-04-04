@@ -279,7 +279,7 @@ lemma (in ast_problem) wf_pa_refs_ac:
    apply simp
   using resolve_action_schema_def index_by_eq_SomeD by fastforce
 
-lemma (in wf_ast_problem) res_aux:
+lemma (in wf_ast_domain) res_aux:
   "resolve_action_schema n = Some ac \<longleftrightarrow>
      ac \<in> set (actions D) \<and> ac_name ac = n"
   by (simp add: resolve_action_schema_def wf_D(6))
