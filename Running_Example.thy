@@ -2,7 +2,7 @@ theory Running_Example
   imports Main
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"
     PDDL_Checker_Utils
-    Type_Normalization Goal_Normalization Precondition_Normalization
+    Grounding_Pipeline
     PDDL_Relaxation
 begin
 

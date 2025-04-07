@@ -46,10 +46,7 @@ fun restore_pa_split where
   "restore_pa_split (PAction n args) = PAction (drop prefix_padding n) args"
 abbreviation "restore_plan_split \<pi>s \<equiv> map restore_pa_split \<pi>s"
 
-definition (in ast_domain) "prec_normed_dom \<equiv>
-  \<forall>ac \<in> set (actions D). is_conj (ac_pre ac)"
-
-abbreviation (in ast_problem) "prec_normed_prob \<equiv> prec_normed_dom"
+(* prec_normed_dom taken from here *)
 
 end
 

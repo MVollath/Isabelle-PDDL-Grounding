@@ -1,22 +1,16 @@
 theory PDDL_Relaxation
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    Utils PDDL_Sema_Supplement
+    Utils PDDL_Sema_Supplement Formula_Utils
 begin
 
-(* This is only defined for pure conjunctive clauses. *)
-fun remove_neg_lits :: "'a formula \<Rightarrow> 'a formula" where
-  "remove_neg_lits (Atom a) = Atom a" |
-  "remove_neg_lits (\<^bold>\<not>\<bottom>) = (\<^bold>\<not>\<bottom>)" |
-  "remove_neg_lits (Atom a \<^bold>\<and> c) = (Atom a \<^bold>\<and> remove_neg_lits c)" |
-  "remove_neg_lits (\<^bold>\<not>(Atom a) \<^bold>\<and> c) = remove_neg_lits c" |
-  "remove_neg_lits _ = undefined"
+term is_conj
 
 fun relax_eff :: "'a ast_effect \<Rightarrow> 'a ast_effect" where
   "relax_eff (Effect a b) = Effect a []"
 
 fun relax_ac :: "ast_action_schema \<Rightarrow> ast_action_schema" where
   "relax_ac (Action_Schema n params pre eff) =
-    Action_Schema n params (remove_neg_lits pre) (relax_eff eff)"
+    Action_Schema n params (relax_conj pre) (relax_eff eff)"
 
 definition (in ast_domain) "relax_dom \<equiv>
   Domain
@@ -30,7 +24,66 @@ definition (in ast_problem) "relax_prob \<equiv>
     relax_dom
     (objects P)
     (init P)
-    (remove_neg_lits (goal P))"
+    (relax_conj (goal P))"
+
+subsection \<open> Contexts \<close>
+
+text \<open> locale setup for simplified syntax \<close>
+
+(* replace with D\<^sup>+ and P\<^sup>+ *)
+abbreviation (in ast_domain) (input) "DX \<equiv> relax_dom"
+abbreviation (in ast_problem) (input) "PX \<equiv> relax_prob"
+
+locale ast_domain_rx = ast_domain
+sublocale ast_domain_rx \<subseteq> dx: ast_domain DX .
+
+locale normed_dom_rx = normed_dom
+sublocale normed_dom_rx \<subseteq> dx: ast_domain DX .
+(* this is later strengthened to "dx: normed_dom DX" *)
+sublocale normed_dom_rx \<subseteq> ast_domain_rx .
+
+locale ast_problem_rx = ast_problem
+sublocale ast_problem_rx \<subseteq> px: ast_problem PX .
+sublocale ast_problem_rx \<subseteq> ast_domain_rx D .
+
+locale normed_prob_rx = normed_prob
+sublocale normed_prob_rx \<subseteq> px : ast_problem PX.
+(* this is later strengthened to "px: normed_prob PX" *)
+sublocale normed_prob_rx \<subseteq> ast_problem_rx .
+sublocale normed_prob_rx \<subseteq> normed_dom_rx D
+  by unfold_locales
+
+subsection \<open> Preserving normalization \<close>
+
+theorem (in normed_dom_rx) relax_dom_normed:
+  "dx.normalized_dom"
+  sorry
+
+theorem (in normed_prob_rx) relax_normed:
+  "px.normalized_prob"
+  sorry
+
+subsection \<open> Preserving Well-Formedness \<close>
+
+theorem (in normed_dom_rx) relax_dom_wf:
+  "dx.wf_domain"
+  sorry
+
+theorem (in normed_prob_rx) relax_wf:
+  "px.wf_problem"
+  sorry
+
+sublocale normed_dom_rx \<subseteq> dx: normed_dom DX
+  apply (unfold_locales)
+  using relax_dom_normed relax_dom_wf by simp_all
+
+sublocale normed_prob_rx \<subseteq> px: normed_prob PX
+  apply (unfold_locales)
+  using relax_normed relax_wf by simp_all
+
+subsection \<open> Semantics \<close>
+
+
 
 subsection \<open> Code Setup \<close>
 

@@ -1,6 +1,7 @@
 theory Grounded_PDDL
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    Formula_Normalization Utils AbLa_alts
+    PDDL_Sema_Supplement
+    Utils
 begin
 
 context wf_ast_domain begin

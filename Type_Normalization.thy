@@ -40,9 +40,6 @@ sublocale restr_problem \<subseteq> restr_domain "D"
 
 subsection \<open>Type Normalization\<close>
 
-(* TODO think of a better name *)
-abbreviation "\<omega> \<equiv> Either [''object'']"
-
 context ast_domain
 begin
 
@@ -116,30 +113,7 @@ definition (in ast_problem) detype_prob :: "ast_problem" where
     (remdups (supertype_facts (all_consts) @ (init P)))
     (goal P)"
 
-(*
-- type hierarchy is empty (implicitly includes ''object'')
-- Everything else is Either [''object''].
-  This is a little superfluous: If well-formed, they can only be [''object'', ''object'', ...],
-    which is semantically equivalent to [''object'']
-  - predicate argument types are Either [''object''].
-  - const types are Either [''object'']
-  - actions parameters are detyped
-    This isn't superfluous because wf_action_schema does not ensure well-formed param types. *)
-definition (in ast_domain) typeless_dom :: "bool" where
-  "typeless_dom \<equiv>
-    types D = []
-    \<and> (\<forall>p \<in> set (predicates D). \<forall>T \<in> set (argTs p). T = \<omega>)
-    \<and> (\<forall>(n, T) \<in> set (consts D). T = \<omega>)
-    \<and> (\<forall>ac \<in> set (actions D). \<forall>(n, T) \<in> set (parameters ac). T = \<omega>)"
-
-(*
-- domain is detyped
-- objects are detyped
-*)
-definition (in ast_problem) typeless_prob :: "bool" where
-  "typeless_prob \<equiv>
-    typeless_dom
-    \<and> (\<forall>(n, T) \<in> set (objects P). T = \<omega>)"
+(* typeless_dom and prob taken from here *)
 
 (* This will be referenced a lot in proofs. *)
 abbreviation (in ast_problem) "sf_substate \<equiv> set (supertype_facts all_consts)"

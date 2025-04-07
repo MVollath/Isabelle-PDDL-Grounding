@@ -1,5 +1,6 @@
 theory Grounding_Pipeline
-imports Type_Normalization Goal_Normalization Precondition_Normalization
+  imports Type_Normalization Goal_Normalization Precondition_Normalization
+    PDDL_Relaxation
 begin
 
 subsection \<open> Setting up compact notations \<close>
@@ -56,9 +57,6 @@ subsection \<open> Normalization correctness \<close>
 context ast_problem begin
 
 definition "P\<^sub>N \<equiv> ast_problem.split_prob (ast_problem.degoal_prob detype_prob)"
-
-definition "normalized_prob \<equiv>
-  typeless_prob \<and> (is_conj (goal P)) \<and> prec_normed_prob"
 
 definition "reconstruct_plan_norm \<pi>s \<equiv>
   ast_domain.restore_plan_degoal detype_dom
