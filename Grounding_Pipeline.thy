@@ -50,6 +50,26 @@ lemma restore_plan_split_valid_compact:
   using wf_ast_problem4.restore_plan_split_valid
   using wf_ast_problem4_def wf_ast_problem.intro by simp
 
+thm ast_problem.relax_prob_sel
+lemma relax_wf_normed_compact:
+  "wf_problem \<Longrightarrow> normalized_prob \<Longrightarrow>
+    ast_problem.normalized_prob relax_prob \<and> ast_problem.wf_problem relax_prob"
+  using normed_prob_rx.relax_normed normed_prob_rx.relax_wf
+  unfolding normed_prob_rx_def normed_prob_def wf_ast_problem_def normed_prob_axioms_def
+  by blast
+lemma relax_achievables_compact:
+  "wf_problem \<Longrightarrow> normalized_prob \<Longrightarrow>
+    {a. achievable a} \<subseteq> {a. ast_problem.achievable relax_prob a}"
+  using normed_prob_rx.relax_achievables
+  unfolding normed_prob_rx_def normed_prob_def wf_ast_problem_def normed_prob_axioms_def
+  by blast
+lemma relax_applicables_compact:
+  "wf_problem \<Longrightarrow> normalized_prob \<Longrightarrow>
+    {\<pi>. applicable \<pi>} \<subseteq> {\<pi>. ast_problem.applicable relax_prob \<pi>}"
+  using normed_prob_rx.relax_applicables
+  unfolding normed_prob_rx_def normed_prob_def wf_ast_problem_def normed_prob_axioms_def
+  by blast
+
 end
 
 subsection \<open> Normalization correctness \<close>
@@ -132,4 +152,18 @@ theorem normalization_reconstruct:
 
 end
 
+subsection \<open> Relaxation \<close>
+
+context ast_problem begin
+lemma assumes "restrict_prob" "wf_problem"
+  shows "{\<pi>. ast_problem.applicable P\<^sub>N \<pi>} \<subseteq> {\<pi>. ast_problem.applicable (ast_problem.relax_prob P\<^sub>N) \<pi>}"
+  using assms normalization_normalizes normalization_wf ast_problem.relax_applicables_compact by simp
+
+lemma assumes "restrict_prob" "wf_problem"
+  shows "{a. ast_problem.achievable P\<^sub>N a} \<subseteq> {a. ast_problem.achievable (ast_problem.relax_prob P\<^sub>N) a}"
+  using assms normalization_normalizes normalization_wf ast_problem.relax_achievables_compact by simp
+
+
+
+end
 end

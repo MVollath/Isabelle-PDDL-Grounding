@@ -1,7 +1,7 @@
 theory Type_Normalization
   imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
     PDDL_Sema_Supplement PDDL_Instance_Relationships
-    Formula_Utils Graph_Funs String_Shenanigans
+    Formula_Utils Graph_Funs String_Shenanigans Normalization_Definitions
 begin
 
 subsection \<open> Input Restriction \<close>

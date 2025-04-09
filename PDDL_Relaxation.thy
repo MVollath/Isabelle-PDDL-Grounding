@@ -1,6 +1,6 @@
 theory PDDL_Relaxation
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    Utils PDDL_Sema_Supplement Formula_Utils
+    Utils PDDL_Sema_Supplement Formula_Utils Normalization_Definitions
 begin
 
 term is_conj
@@ -64,6 +64,13 @@ lemma (in ast_domain) relax_ac_sel[simp]:
   apply (cases ac; simp)
   apply (cases ac; simp)
   apply (cases ac; simp)
+  done
+
+lemma (in ast_domain) relax_eff_sel[simp]:
+  "adds (relax_eff e) = adds e"
+  "dels (relax_eff e) = []"
+   apply (cases e; simp)
+  apply (cases e; simp)
   done
 
 lemma (in ast_domain) relax_dom_sel[simp]:
@@ -158,8 +165,18 @@ lemma (in ast_domain) relax_eff_wf:
   "wf_effect tyt eff \<Longrightarrow> wf_effect tyt (relax_eff eff)"
   by (cases eff) simp
 
+lemma (in ast_problem_rx) rx_I: "px.I = I"
+  unfolding ast_problem.I_def relax_prob_sel ..
+
 lemma (in ast_problem_rx) rx_objT: "px.objT = objT"
   unfolding ast_problem.objT_def rx_constT relax_prob_sel ..
+
+lemma (in ast_problem_rx) rx_is_obj_of_type: "px.is_obj_of_type = is_obj_of_type"
+  unfolding ast_problem.is_obj_of_type_def rx_objT ast_domain.of_type_def
+    ast_domain.subtype_rel_def relax_prob_sel relax_dom_sel .. 
+
+lemma (in ast_problem_rx) rx_wf_wm: "px.wf_world_model = wf_world_model"
+  unfolding ast_problem.wf_world_model_def relax_prob_sel rx_wf_fmla_atom rx_objT ..
 
 lemma (in ast_domain) relax_ac_names:
   "map ac_name (actions D) = map ac_name (map relax_ac (actions D))"
@@ -212,6 +229,157 @@ sublocale normed_prob_rx \<subseteq> px: normed_prob PX
 
 subsection \<open> Semantics \<close>
 
+lemma (in normed_dom_rx) rx_resolve:
+  assumes "resolve_action_schema n = Some a"
+  shows "dx.resolve_action_schema n = Some (relax_ac a)"
+  using assms res_aux dx.res_aux by simp
+
+lemma (in normed_dom_rx) rx_resolve':
+  assumes "dx.resolve_action_schema n = Some a'"
+  obtains a where "resolve_action_schema n = Some a"
+  using that assms res_aux dx.res_aux by auto
+
+lemma (in wf_ast_problem) plan_action_path_single:
+  assumes "plan_action_path N [p] M"
+  shows "plan_action_enabled p N" "execute_plan_action p N = M"
+  using assms plan_action_path_def execute_plan_action_def ground_action_path.simps
+    plan_action_enabled_def apply simp
+  using assms by (metis plan_action_path_Cons plan_action_path_Nil)
+
+lemma (in - ) relax_cw_entailment:
+  assumes "wm_basic M" "wm_basic M'" "M \<subseteq> M'" "M \<^sup>c\<TTurnstile>\<^sub>= \<phi>" "is_conj \<phi>"
+  shows "M' \<^sup>c\<TTurnstile>\<^sub>= relax_conj \<phi>"
+proof -
+  have "valuation M' \<Turnstile> relax_conj \<phi>" if "valuation M \<Turnstile> \<phi>"
+    (* TODO custom induction rule for relax_conj if is_conj *)
+    using that assms(5) apply (induction \<phi> rule: is_conj.induct)
+    subgoal for F G
+      apply (cases F)
+      subgoal for x
+        using assms(3) valuation_def by (cases x) auto
+    apply simp
+      subgoal for x
+        by (cases x) auto
+      by simp_all
+    subgoal for x
+      using assms(3) valuation_def by (cases x) auto
+       apply simp
+    subgoal for x by (cases x) auto
+    by simp_all
+
+  with assms show ?thesis by (simp add: valuation_iff_close_world)
+qed
+
+
+lemma (in normed_prob_rx) rx_enabled:
+  assumes "wm_basic M" "wm_basic M'" "M \<subseteq> M'" "plan_action_enabled \<pi> M"
+  shows "px.plan_action_enabled \<pi> M'"
+proof (cases \<pi>)
+  case (PAction n args)
+  then obtain a where a: "resolve_action_schema n = Some a"
+    using assms plan_action_enabled_def by fastforce
+  hence a': "px.resolve_action_schema n = Some (relax_ac a)"
+    using rx_resolve by simp
+
+  have pre_conj: "is_conj (ac_pre a)"
+    using a normed_dom[unfolded norm_dom_defs] res_aux by fast
+
+  from assms(4) have wf: "wf_plan_action \<pi>" and
+    sat: "M \<^sup>c\<TTurnstile>\<^sub>= precondition (resolve_instantiate \<pi>)"
+    using plan_action_enabled_def by simp_all
+
+  show ?thesis
+    unfolding px.plan_action_enabled_def
+    apply (rule conjI)
+    (* proving \<open>px.wf_plan_action \<pi>\<close> *)
+    using wf unfolding PAction
+    unfolding wf_plan_action_simple px.wf_plan_action_simple
+    unfolding a a' apply simp
+    unfolding ast_problem.action_params_match_def relax_ac_sel rx_is_obj_of_type apply simp
+    (* proving \<open>M' \<^sup>c\<TTurnstile>\<^sub>= precondition (px.resolve_instantiate \<pi>)\<close> *)
+    using sat unfolding PAction
+    unfolding ast_problem.resolve_instantiate.simps a a' apply simp
+    unfolding instantiate_action_schema_alt apply simp
+    unfolding relax_conj_map[OF pre_conj]
+    using assms relax_cw_entailment
+      by (simp add: map_preserves_isconj pre_conj)
+qed                          
+
+lemma (in -) map_effect_alt: "map_ast_effect f e = Effect (map (map_atom_fmla f) (adds e)) (map (map_atom_fmla f) (dels e))"
+  by (cases e) simp_all
+
+
+(* technically, it only has to be resolvable for this lemma to hold,
+  but using "enabled" is more concise and that's how it's used. *)
+lemma (in normed_prob_rx) rx_exec:
+  assumes "M \<subseteq> M'" "plan_action_enabled \<pi> M"
+  shows "execute_plan_action \<pi> M \<subseteq> px.execute_plan_action \<pi> M'"
+  using assms
+proof (cases \<pi>)
+  case (PAction n args)
+  then obtain a where a: "resolve_action_schema n = Some a"
+    using assms plan_action_enabled_def by fastforce
+  hence a': "px.resolve_action_schema n = Some (relax_ac a)"
+    using rx_resolve by simp
+  show ?thesis
+    unfolding PAction
+    unfolding ast_problem.execute_plan_action_def
+    unfolding ast_problem.resolve_instantiate.simps a a' apply simp
+    unfolding instantiate_action_schema_alt apply simp
+    unfolding apply_effect_alt map_effect_alt
+    unfolding ast_effect.sel relax_eff_sel
+    using assms by auto
+qed
+
+lemma (in normed_prob_rx) rx_path_right:
+  assumes "M1 \<subseteq> M1'" "plan_action_path M1 \<pi>s M2" "wf_world_model M1" "px.wf_world_model M1'"
+  shows "\<exists>M2'. px.plan_action_path M1' \<pi>s M2' \<and> M2 \<subseteq> M2'"
+  using assms proof (induction \<pi>s arbitrary: M1 M1')
+  case (Cons \<pi> \<pi>s)
+  hence 1: "plan_action_enabled \<pi> M1" "plan_action_path (execute_plan_action \<pi> M1) \<pi>s M2"
+    by simp_all
+
+  from Cons.prems have C1: "execute_plan_action \<pi> M1 \<subseteq> px.execute_plan_action \<pi> M1'"
+    using rx_exec by simp
+  from Cons.prems have C2: "px.plan_action_enabled \<pi> M1'"
+    using rx_enabled ast_problem.wf_wm_basic by fastforce
+
+  have "wf_world_model (execute_plan_action \<pi> M1)"
+    "px.wf_world_model (px.execute_plan_action \<pi> M1')"
+    using Cons.prems wf_execute 1 apply simp
+    using Cons.prems px.wf_execute C2 by simp
+
+  with C1 obtain M2' where "px.plan_action_path (px.execute_plan_action \<pi> M1') \<pi>s M2'" "M2 \<subseteq> M2'"
+    using 1 Cons by blast
+  with C2 show ?case by auto
+qed simp
+
+theorem (in normed_prob_rx) relax_achievables:
+  "{a. achievable a} \<subseteq> {a. px.achievable a}"
+proof
+  fix a assume "a \<in> {a. achievable a}"
+  then obtain \<pi>s M where o: "plan_action_path I \<pi>s M" "a \<in> M"
+    using achievable_def by blast
+  have "I \<subseteq> px.I" using rx_I by simp
+  with o(1) obtain M' where "px.plan_action_path px.I \<pi>s M'" "M \<subseteq> M'"
+    using wf_I px.wf_I rx_path_right by blast
+  thus "a \<in> {a. px.achievable a}"
+    using px.achievable_def o(2) by blast
+qed
+
+theorem (in normed_prob_rx) relax_applicables:
+  "{\<pi>. applicable \<pi>} \<subseteq> {\<pi>. px.applicable \<pi>}"
+proof
+  fix x
+  assume "x \<in> {\<pi>. applicable \<pi>}"
+  then obtain \<pi>s M where o: "plan_action_path I \<pi>s M" "x \<in> set \<pi>s"
+    using applicable_def by blast
+  have "I \<subseteq> px.I" using rx_I by simp
+  with o(1) obtain M' where "px.plan_action_path px.I \<pi>s M'"
+    using wf_I px.wf_I rx_path_right by blast
+  thus "x \<in> {\<pi>. px.applicable \<pi>}"
+    using px.applicable_def o(2) by blast
+qed
 
 
 subsection \<open> Code Setup \<close>

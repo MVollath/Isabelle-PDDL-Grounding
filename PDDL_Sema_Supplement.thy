@@ -3,80 +3,6 @@ theory PDDL_Sema_Supplement
   Utils Formula_Utils
 begin
 
-abbreviation "ac_name \<equiv> ast_action_schema.name"
-abbreviation "ac_params \<equiv> ast_action_schema.parameters"
-abbreviation "ac_pre \<equiv> ast_action_schema.precondition"
-abbreviation "ac_eff \<equiv> ast_action_schema.effect"
-
-subsection \<open> Normalization definitions \<close>
-text \<open> The only reason these are here instead of in their respective
-  normalization files is to reduce dependencies across files.
-  This benefits development on my low-RAM laptop.\<close>
-
-(* TODO think of a better name *)
-abbreviation "\<omega> \<equiv> Either [''object'']"
-
-(*
-- type hierarchy is empty (implicitly includes ''object'')
-- Everything else is Either [''object''].
-  This is a little superfluous: If well-formed, they can only be [''object'', ''object'', ...],
-    which is semantically equivalent to [''object'']
-  - predicate argument types are Either [''object''].
-  - const types are Either [''object'']
-  - actions parameters are detyped
-    This isn't superfluous because wf_action_schema does not ensure well-formed param types. *)
-definition (in ast_domain) typeless_dom :: "bool" where
-  "typeless_dom \<equiv>
-    types D = []
-    \<and> (\<forall>p \<in> set (predicates D). \<forall>T \<in> set (argTs p). T = \<omega>)
-    \<and> (\<forall>(n, T) \<in> set (consts D). T = \<omega>)
-    \<and> (\<forall>ac \<in> set (actions D). \<forall>(n, T) \<in> set (ac_params ac). T = \<omega>)"
-
-(*
-- domain is detyped
-- objects are detyped
-*)
-definition (in ast_problem) typeless_prob :: "bool" where
-  "typeless_prob \<equiv>
-    typeless_dom
-    \<and> (\<forall>(n, T) \<in> set (objects P). T = \<omega>)"
-
-definition (in ast_domain) "prec_normed_dom \<equiv>
-  \<forall>ac \<in> set (actions D). is_conj (ac_pre ac)"
-
-abbreviation (in ast_problem) "prec_normed_prob \<equiv> prec_normed_dom"
-
-definition (in ast_domain) "normalized_dom \<equiv>
-  typeless_dom \<and> prec_normed_dom"
-
-definition (in ast_problem) "normalized_prob \<equiv>
-  typeless_prob \<and> (is_conj (goal P)) \<and> prec_normed_prob"
-
-lemma (in ast_problem) normed_prob_normed_dom:
-  "normalized_prob \<Longrightarrow> normalized_dom"
-  unfolding normalized_prob_def normalized_dom_def typeless_prob_def by blast
-
-definition (in ast_domain) "relaxed_dom \<equiv>
-  normalized_dom \<and> (\<forall>a \<in> set (actions D). is_pos_conj (ac_pre a))"
-
-definition (in ast_problem) "relaxed_prob \<equiv>
-  normalized_prob \<and> is_pos_conj (goal P) \<and>
-    (\<forall>a \<in> set (actions D). is_pos_conj (ac_pre a))"
-
-(* contexts *)
-
-term wf_ast_problem
-
-locale normed_dom = wf_ast_domain D for D +
-  assumes normed_dom: normalized_dom
-
-locale normed_prob = wf_ast_problem P for P +
-  assumes normed_prob: normalized_prob
-
-sublocale normed_prob \<subseteq> normed_dom D
-  apply (unfold_locales)
-  using normed_prob normed_prob_normed_dom by simp
-
 subsection \<open> sugar \<close>
 
 (* not much here yet *)
@@ -108,10 +34,11 @@ abbreviation (input) get_t :: "type \<Rightarrow> name" where
 lemma get_t_alt: "get_t (Either (t # ts)) = t"
   by simp
 
-lemma is_predAtom_decomp: assumes "is_predAtom \<phi>"
-  obtains p xs where "\<phi> = Atom (predAtm p xs)"
-  using assms apply (cases \<phi>)
-  apply (meson is_predAtom.elims(2))
+lemma is_predAtom_decomp:
+  "is_predAtom a \<longleftrightarrow> (\<exists>p xs. a = Atom (predAtm p xs))"
+  apply (cases a)
+  subgoal for x
+    by (cases x) simp_all
   by simp_all
 
 abbreviation (in ast_domain) pred_names :: "name list" where
@@ -129,6 +56,11 @@ text \<open>Alternative definitions. Most of these just remove pattern matching
   help resolve it directly. \<close>
 
 abbreviation "map_atom_fmla \<equiv> map_formula \<circ> map_atom"
+
+abbreviation "ac_name \<equiv> ast_action_schema.name"
+abbreviation "ac_params \<equiv> ast_action_schema.parameters"
+abbreviation "ac_pre \<equiv> ast_action_schema.precondition"
+abbreviation "ac_eff \<equiv> ast_action_schema.effect"
 
 context ast_domain begin
 lemma wf_fmla_alt: "wf_fmla tyt \<phi> = (\<forall>a\<in>atoms \<phi>. wf_atom tyt a)"

@@ -1,6 +1,6 @@
 theory Precondition_Normalization
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    PDDL_Sema_Supplement Utils String_Shenanigans DNF
+    PDDL_Sema_Supplement Utils String_Shenanigans DNF Normalization_Definitions
 begin
 
 definition "n_clauses ac \<equiv> length (dnf_list (ac_pre ac))"

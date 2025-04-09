@@ -42,7 +42,7 @@ lemma eq_contr: "(a = b \<Longrightarrow> False) \<Longrightarrow> a \<noteq> b"
 (* lists *)
 
 (* Saves a a line or two sometimes *)
-lemma list_induct_n:
+lemma list_induct_n [case_names nil suc]:
   assumes "length xs = n" "P [] 0"
   "\<And>x xs n. length xs = n \<Longrightarrow>
   P xs n \<Longrightarrow> P (x # xs) (Suc n)" shows "P xs n"

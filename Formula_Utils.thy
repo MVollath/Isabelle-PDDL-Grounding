@@ -62,6 +62,7 @@ fun relax_conj :: "'a formula \<Rightarrow> 'a formula" where
   "relax_conj (F \<^bold>\<and> G) = relax_lit F \<^bold>\<and> relax_conj G" |
   "relax_conj f = relax_lit f"
 
+
 lemma relax_conj_pos: "is_conj F \<Longrightarrow> is_pos_conj (relax_conj F)"
   apply (induction F rule: is_conj.induct) apply (simp_all add: relax_lit_pos)
   subgoal for v apply (cases v) apply simp_all done done
@@ -90,6 +91,19 @@ proof -
   thus "A \<Turnstile> F \<Longrightarrow> A \<Turnstile> relax_conj F" using un_and_sem by auto
 qed
 
+lemma relax_conj_map:
+  assumes "is_conj F"
+  shows "map_formula m (relax_conj F) = relax_conj (map_formula m F)"
+  using assms proof (induction F)
+  case (Not F)
+  then show ?case by (cases F) simp_all
+next
+  case (And F G) thus ?case
+  proof (cases F)
+    case (Not a)
+    thus ?thesis using And by (cases a) simp_all
+  qed simp_all
+qed simp_all
 
 lemma map_preserves_isconj:
   assumes "is_conj F" shows "is_conj (map_formula m F)"
