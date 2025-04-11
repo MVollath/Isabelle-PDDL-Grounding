@@ -81,6 +81,14 @@ definition ground_prob :: "ast_problem" where
     (map (map_formula map_fact) (init P))
     (map_formula map_fact (goal P))"
 
+abbreviation "gr_ac_names \<equiv> map2 ground_ac_name ops op_ids"
+definition "pa_map \<equiv> map_of (zip gr_ac_names ops)"
+
+fun restore_ground_pa :: "plan_action \<Rightarrow> plan_action" where
+  "restore_ground_pa (PAction n args) = the (pa_map n)"
+
+abbreviation restore_ground_plan :: "plan_action list \<Rightarrow> plan_action list" where
+  "restore_ground_plan \<pi>s \<equiv> map restore_ground_pa \<pi>s"
 
 end
 
@@ -145,6 +153,8 @@ lemmas pddl_ground_code =
   grounder.ground_prob_def
   grounder.ground_ac_name.simps
   grounder.fact_map_def
+  grounder.pa_map_def
+  grounder.restore_ground_pa.simps
 declare pddl_ground_code[code]
 
 

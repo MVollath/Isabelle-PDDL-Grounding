@@ -168,6 +168,8 @@ definition "ops \<equiv> [
 
 value "grounder.ground_prob my_problem facts ops"
 
+value "grounder.restore_ground_pa ops (PAction ''0/drive-c1-A-D'' [])"
+
 
 subsection \<open> Execution \<close>
 
