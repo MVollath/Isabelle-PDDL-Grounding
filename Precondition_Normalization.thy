@@ -16,7 +16,7 @@ fun (in -) set_n_pre :: " ast_action_schema \<Rightarrow> string \<Rightarrow> t
   = Action_Schema n params pre eff"
 
 definition "split_ac_names ac \<equiv>
-  map (\<lambda>prefix. pad split_pre_pad prefix @ ac_name ac)
+  map (\<lambda>prefix. padl split_pre_pad prefix @ ac_name ac)
     (distinct_strings (n_clauses ac))"
 
 definition split_ac :: "ast_action_schema \<Rightarrow> ast_action_schema list" where
@@ -122,7 +122,7 @@ lemma (in ast_domain) split_ac_nth:
   assumes "i < length (dnf_list (ac_pre ac))"
   shows "split_ac ac ! i =
     Action_Schema
-      (pad split_pre_pad (show i) @ ac_name ac)
+      (padl split_pre_pad (show i) @ ac_name ac)
       (ac_params ac)
       (dnf_list (ac_pre ac) ! i)
       (ac_eff ac)"
@@ -140,7 +140,7 @@ lemma (in ast_domain) split_pres: "map ac_pre (split_ac a) = dnf_list (ac_pre a)
 lemma (in ast_domain) split_ac_sel:
   assumes "a' \<in> set (split_ac a)"
   shows
-    "\<exists>i < length (split_ac a). ac_name a' = pad split_pre_pad (show i) @ ac_name a"
+    "\<exists>i < length (split_ac a). ac_name a' = padl split_pre_pad (show i) @ ac_name a"
     "ac_params a' = ac_params a"
     "ac_pre a' \<in> set (dnf_list (ac_pre a))"
     "ac_eff a' = ac_eff a"
@@ -151,7 +151,7 @@ proof -
     using in_set_conv_nth by metis
   from i show "ac_pre a' \<in> set (dnf_list (ac_pre a))"
     using split_ac_nth split_ac_len(1) by simp
-  from i show "\<exists>i < length (split_ac a). ac_name a' = pad split_pre_pad (show i) @ ac_name a"
+  from i show "\<exists>i < length (split_ac a). ac_name a' = padl split_pre_pad (show i) @ ac_name a"
     using split_ac_nth split_ac_len(1) by auto
 qed
 
@@ -233,15 +233,15 @@ lemma (in ast_domain) split_names_prefix_length:
 proof -
   from assms(2)[unfolded split_ac_names_def] obtain p where
     pin: "p \<in> set (distinct_strings (n_clauses ac))" and
-    n: "n = pad split_pre_pad p @ ac_name ac"
+    n: "n = padl split_pre_pad p @ ac_name ac"
     by auto
 
   have "n_clauses ac \<le> max_n_clauses"
     using max_n_clauses_def assms(1) by simp
   hence "length p \<le> split_pre_pad"
     using pin split_pre_pad_def distinct_strings_max_len by simp
-  hence "length (pad split_pre_pad p) = split_pre_pad"
-    using pad_length(1) by auto
+  hence "length (padl split_pre_pad p) = split_pre_pad"
+    using padl_length(1) by auto
   thus ?thesis using n by simp
 qed
 
@@ -249,7 +249,7 @@ lemma (in ast_domain) split_names_distinct:
   shows "distinct (split_ac_names ac)"
 proof -
   have "split_ac_names ac =
-    map (\<lambda>p. p @ ac_name ac) (map (pad split_pre_pad) (distinct_strings (n_clauses ac)))"
+    map (\<lambda>p. p @ ac_name ac) (map (padl split_pre_pad) (distinct_strings (n_clauses ac)))"
     unfolding split_ac_names_def by simp
   thus ?thesis using distinct_strings_padded append_r_distinct by metis
 qed

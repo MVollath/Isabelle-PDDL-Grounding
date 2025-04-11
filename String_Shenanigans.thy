@@ -229,16 +229,16 @@ lemma distinct_strings_prefix: "prefix (distinct_strings n) (distinct_strings (n
   using distinct_strings_def nat_range_prefix map_mono_prefix by metis
 
 lemma distinct_strings_padded:
-  shows "distinct (map (pad k) (distinct_strings n))"
+  shows "distinct (map (padl k) (distinct_strings n))"
 proof -
   let ?d = "distinct_strings n"
-  have "map (pad k) ?d ! i \<noteq> map (pad k) ?d ! j"
+  have "map (padl k) ?d ! i \<noteq> map (padl k) ?d ! j"
     if "i < length ?d" "j < length ?d" "i \<noteq> j" for i j
   proof -
     from that have notin: "CHR ''_'' \<notin> set (?d ! i)" "CHR ''_'' \<notin> set (?d ! j)"
       using distinct_strings_def notin_show_nat list_ball_nth by simp_all
     from that have  "?d ! i \<noteq> ?d ! j" using distinct_strings_dist distinct_conv_nth by metis
-    hence "pad k (?d ! i) \<noteq> pad k (?d ! j)" using pad_neq notin by simp
+    hence "padl k (?d ! i) \<noteq> padl k (?d ! j)" using padl_neq notin by simp
     thus ?thesis using that by auto
   qed
   thus ?thesis using distinct_conv_nth by force
