@@ -50,7 +50,6 @@ lemma restore_plan_split_valid_compact:
   using wf_ast_problem4.restore_plan_split_valid
   using wf_ast_problem4_def wf_ast_problem.intro by simp
 
-thm ast_problem.relax_prob_sel
 lemma relax_wf_normed_compact:
   "wf_problem \<Longrightarrow> normalized_prob \<Longrightarrow>
     ast_problem.normalized_prob relax_prob \<and> ast_problem.wf_problem relax_prob"

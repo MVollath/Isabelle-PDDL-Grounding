@@ -4,19 +4,19 @@ imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
 begin
 
 definition "n_clauses ac \<equiv> length (dnf_list (ac_pre ac))"
-abbreviation "max_length' xs \<equiv> Max (length ` set xs)"
 
 context ast_domain begin
 
 definition "max_n_clauses \<equiv> Max (set (map n_clauses (actions D)))"
-definition "prefix_padding \<equiv> max_length' (distinct_strings max_n_clauses) + 1"
+(* Technically, (max_n_clauses - 1) would be enough.*)
+definition "split_pre_pad \<equiv> length (show max_n_clauses)"
 
 fun (in -) set_n_pre :: " ast_action_schema \<Rightarrow> string \<Rightarrow> term atom formula \<Rightarrow> ast_action_schema" where
   "set_n_pre (Action_Schema _ params _ eff) n pre
   = Action_Schema n params pre eff"
 
 definition "split_ac_names ac \<equiv>
-  map (\<lambda>prefix. pad prefix_padding prefix @ ac_name ac)
+  map (\<lambda>prefix. pad split_pre_pad prefix @ ac_name ac)
     (distinct_strings (n_clauses ac))"
 
 definition split_ac :: "ast_action_schema \<Rightarrow> ast_action_schema list" where
@@ -43,7 +43,7 @@ definition (in ast_problem) "split_prob \<equiv>
 (* it's important to be able to convert a plan for the output problem into a plan for the input problem.
   The other direction is probably (hopefully?) not important. *)
 fun restore_pa_split where
-  "restore_pa_split (PAction n args) = PAction (drop prefix_padding n) args"
+  "restore_pa_split (PAction n args) = PAction (drop split_pre_pad n) args"
 abbreviation "restore_plan_split \<pi>s \<equiv> map restore_pa_split \<pi>s"
 
 (* prec_normed_dom taken from here *)
@@ -122,7 +122,7 @@ lemma (in ast_domain) split_ac_nth:
   assumes "i < length (dnf_list (ac_pre ac))"
   shows "split_ac ac ! i =
     Action_Schema
-      (pad prefix_padding (unique_string i) @ ac_name ac)
+      (pad split_pre_pad (show i) @ ac_name ac)
       (ac_params ac)
       (dnf_list (ac_pre ac) ! i)
       (ac_eff ac)"
@@ -140,7 +140,7 @@ lemma (in ast_domain) split_pres: "map ac_pre (split_ac a) = dnf_list (ac_pre a)
 lemma (in ast_domain) split_ac_sel:
   assumes "a' \<in> set (split_ac a)"
   shows
-    "\<exists>i < length (split_ac a). ac_name a' = pad prefix_padding (unique_string i) @ ac_name a"
+    "\<exists>i < length (split_ac a). ac_name a' = pad split_pre_pad (show i) @ ac_name a"
     "ac_params a' = ac_params a"
     "ac_pre a' \<in> set (dnf_list (ac_pre a))"
     "ac_eff a' = ac_eff a"
@@ -151,7 +151,7 @@ proof -
     using in_set_conv_nth by metis
   from i show "ac_pre a' \<in> set (dnf_list (ac_pre a))"
     using split_ac_nth split_ac_len(1) by simp
-  from i show "\<exists>i < length (split_ac a). ac_name a' = pad prefix_padding (unique_string i) @ ac_name a"
+  from i show "\<exists>i < length (split_ac a). ac_name a' = pad split_pre_pad (show i) @ ac_name a"
     using split_ac_nth split_ac_len(1) by auto
 qed
 
@@ -229,24 +229,18 @@ context wf_ast_domain4 begin
 
 lemma (in ast_domain) split_names_prefix_length:
   assumes "ac \<in> set (actions D)" "n \<in> set (split_ac_names ac)"
-  shows "\<exists>p. length p = prefix_padding \<and> n = p @ ac_name ac"
+  shows "\<exists>p. length p = split_pre_pad \<and> n = p @ ac_name ac"
 proof -
   from assms(2)[unfolded split_ac_names_def] obtain p where
     pin: "p \<in> set (distinct_strings (n_clauses ac))" and
-    n: "n = pad prefix_padding p @ ac_name ac"
+    n: "n = pad split_pre_pad p @ ac_name ac"
     by auto
 
   have "n_clauses ac \<le> max_n_clauses"
     using max_n_clauses_def assms(1) by simp
-  hence "prefix (distinct_strings (n_clauses ac)) (distinct_strings (max_n_clauses))"
-    using distinct_strings_prefix by (metis le_Suc_ex)
-  hence "set (distinct_strings (n_clauses ac)) \<subseteq> set (distinct_strings (max_n_clauses))"
-    using set_mono_prefix by auto
-  hence "length p \<le> prefix_padding"
-    unfolding prefix_padding_def
-    apply (intro trans_le_add1)
-    using pin by auto (* I'm relieved auto solves that *)
-  hence "length (pad prefix_padding p) = prefix_padding"
+  hence "length p \<le> split_pre_pad"
+    using pin split_pre_pad_def distinct_strings_max_len by simp
+  hence "length (pad split_pre_pad p) = split_pre_pad"
     using pad_length(1) by auto
   thus ?thesis using n by simp
 qed
@@ -255,7 +249,7 @@ lemma (in ast_domain) split_names_distinct:
   shows "distinct (split_ac_names ac)"
 proof -
   have "split_ac_names ac =
-    map (\<lambda>p. p @ ac_name ac) (map (pad prefix_padding) (distinct_strings (n_clauses ac)))"
+    map (\<lambda>p. p @ ac_name ac) (map (pad split_pre_pad) (distinct_strings (n_clauses ac)))"
     unfolding split_ac_names_def by simp
   thus ?thesis using distinct_strings_padded append_r_distinct by metis
 qed
@@ -565,7 +559,7 @@ qed
 
 lemma (in ast_domain4) restore_split_ac:
   assumes "a \<in> set (actions D)" "a' \<in> set (split_ac a)"
-  shows "drop prefix_padding (ac_name a') = ac_name a"
+  shows "drop split_pre_pad (ac_name a') = ac_name a"
 proof -
   from assms have "ac_name a' \<in> set (map ac_name (split_ac a))" by auto
   hence "ac_name a' \<in> set (split_ac_names a)"
@@ -582,7 +576,7 @@ lemma restore_pa_enabled:
 proof (cases \<pi>')
   case [simp]: (PAction n' args)
   let ?pi' = "PAction n' args"
-  let ?pi = "PAction (drop prefix_padding n') args"
+  let ?pi = "PAction (drop split_pre_pad n') args"
 
   from assms(2) obtain a' where a': "p4.resolve_action_schema n' = Some a'" "p4.action_params_match a' args"
     "a' \<in> set (actions D4)" "ac_name a' = n'"
@@ -594,9 +588,9 @@ proof (cases \<pi>')
     using PAction by (metis p_ac inst_pre_iff_split p4.resolve_instantiate.simps option.sel)
 
   (* precondition enabled *)
-  hence "drop prefix_padding (ac_name a') = ac_name a"
+  hence "drop split_pre_pad (ac_name a') = ac_name a"
     using restore_split_ac by simp
-  with a(3) have res: "resolve_action_schema (drop prefix_padding n') = Some a"
+  with a(3) have res: "resolve_action_schema (drop split_pre_pad n') = Some a"
     using res_aux a'(4) by simp
   with a(2) have sat: "M \<^sup>c\<TTurnstile>\<^sub>= precondition (resolve_instantiate ?pi)"
     by simp
@@ -647,7 +641,7 @@ subsection \<open> Code Setup \<close>
 lemmas precond_norm_code =
   n_clauses_def
   ast_domain.max_n_clauses_def
-  ast_domain.prefix_padding_def
+  ast_domain.split_pre_pad_def
   ast_domain.split_ac_names_def
   ast_domain.split_ac_def
   ast_domain.split_acs_def

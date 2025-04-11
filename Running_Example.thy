@@ -3,7 +3,7 @@ theory Running_Example
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"
     PDDL_Checker_Utils
     Grounding_Pipeline
-    PDDL_Relaxation
+    Grounded_PDDL
 begin
 
 subsection \<open> Problem Description \<close>
@@ -104,6 +104,9 @@ definition "my_objs \<equiv> [
   (Obj ''batmobile'', Either [''Batmobile''])
 ]"
 
+abbreviation fact_to_atm :: "(name \<times> string list) \<Rightarrow> object atom formula" where
+  "fact_to_atm f \<equiv> case f of (p, xs) \<Rightarrow> Atom (predAtm (Pred p) (map Obj xs))"
+
 definition "my_init \<equiv> [
   Atom (predAtm (Pred ''at'') [Obj ''c1'', Obj ''A'']),
   Atom (predAtm (Pred ''at'') [Obj ''c2'', Obj ''B'']),
@@ -131,6 +134,40 @@ lemma wf_d1: "ast_domain.wf_domain my_domain"
 
 lemma wf_p1: "ast_problem.wf_problem my_problem"
   by (intro wf_problem_intro) eval
+
+subsection \<open> Grounding Experiment \<close>
+
+definition "facts \<equiv>  map fact_to_atm [
+  (''at'', [''c1'', ''A'']),
+  (''at'', [''c2'', ''B'']),
+  (''at'', [''c3'', ''G'']),
+  (''at'', [''t'', ''E'']),
+  (''at'', [''p1'', ''C'']),
+  (''at'', [''p2'', ''F'']),
+  (''at'', [''batmobile'', ''D'']),
+  (''road'', [''A'', ''D'']),
+  (''road'', [''B'', ''D'']),
+  (''road'', [''C'', ''D'']),
+  (''rails'', [''D'', ''E'']),
+  (''road'', [''E'', ''F'']),
+  (''road'', [''F'', ''G'']),
+  (''road'', [''G'', ''E'']),
+
+  (''at'', [''p1'', ''G'']),
+  (''at'', [''p2'', ''E'']),
+
+  (''at'', [''c1'', ''D'']),
+  (''road'', [''D'', ''A'']),
+  (''at'', [''c1'', ''C''])
+]"
+
+definition "ops \<equiv> [
+  PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']
+]"
+
+
+value "grounder.ground_prob my_problem facts ops"
+
 
 subsection \<open> Execution \<close>
 
@@ -223,7 +260,7 @@ lemma "ast_problem.valid_plan my_prob_degoaled my_plan_2"
 
 subsection \<open> Precondition normalization \<close>
 
-value "ast_domain.prefix_padding my_dom_degoaled"
+value "ast_domain.split_pre_pad my_dom_degoaled"
 value "ast_domain.split_ac_names my_dom_degoaled op_drive"
 value "ast_domain.split_ac my_dom_degoaled op_drive"
 value "ast_domain.split_acs my_dom_degoaled"
@@ -237,29 +274,29 @@ lemma wf_p4: "ast_problem.wf_problem my_prob_split"
 (* A little manual labor to decide which one of the split actions
   corresponds to which step in the original plan. *)
 definition "my_plan_3 \<equiv> [
-  PAction ''0_drive'' [Obj ''c1'', Obj ''A'', Obj ''D''],
-  PAction ''1_drive'' [Obj ''c1'', Obj ''D'', Obj ''C''],
-  PAction ''0_load'' [Obj ''p1'', Obj ''C'', Obj ''c1''],
-  PAction ''0_drive'' [Obj ''c1'', Obj ''C'', Obj ''D''],
-  PAction ''0_unload'' [Obj ''p1'', Obj ''c1'', Obj ''D''],  
-  PAction ''1_choochoo'' [Obj ''t'', Obj ''E'', Obj ''D''],
-  PAction ''1_load'' [Obj ''p1'', Obj ''D'', Obj ''t''],  
-  PAction ''0_choochoo'' [Obj ''t'', Obj ''D'', Obj ''E''],
-  PAction ''1_unload'' [Obj ''p1'', Obj ''t'', Obj ''E''],
+  PAction ''0drive'' [Obj ''c1'', Obj ''A'', Obj ''D''],
+  PAction ''1drive'' [Obj ''c1'', Obj ''D'', Obj ''C''],
+  PAction ''0load'' [Obj ''p1'', Obj ''C'', Obj ''c1''],
+  PAction ''0drive'' [Obj ''c1'', Obj ''C'', Obj ''D''],
+  PAction ''0unload'' [Obj ''p1'', Obj ''c1'', Obj ''D''],  
+  PAction ''1choochoo'' [Obj ''t'', Obj ''E'', Obj ''D''],
+  PAction ''1load'' [Obj ''p1'', Obj ''D'', Obj ''t''],  
+  PAction ''0choochoo'' [Obj ''t'', Obj ''D'', Obj ''E''],
+  PAction ''1unload'' [Obj ''p1'', Obj ''t'', Obj ''E''],
 
-  PAction ''1_drive'' [Obj ''c3'', Obj ''G'', Obj ''F''],
-  PAction ''0_load'' [Obj ''p2'', Obj ''F'', Obj ''c3''],
-  PAction ''1_drive'' [Obj ''c3'', Obj ''F'', Obj ''E''],
-  PAction ''0_unload'' [Obj ''p2'', Obj ''c3'', Obj ''E''],
+  PAction ''1drive'' [Obj ''c3'', Obj ''G'', Obj ''F''],
+  PAction ''0load'' [Obj ''p2'', Obj ''F'', Obj ''c3''],
+  PAction ''1drive'' [Obj ''c3'', Obj ''F'', Obj ''E''],
+  PAction ''0unload'' [Obj ''p2'', Obj ''c3'', Obj ''E''],
 
-  PAction ''0_load'' [Obj ''p1'', Obj ''E'', Obj ''c3''],
-  PAction ''1_drive'' [Obj ''c3'', Obj ''E'', Obj ''G''],
-  PAction ''0_unload'' [Obj ''p1'', Obj ''c3'', Obj ''G''],
+  PAction ''0load'' [Obj ''p1'', Obj ''E'', Obj ''c3''],
+  PAction ''1drive'' [Obj ''c3'', Obj ''E'', Obj ''G''],
+  PAction ''0unload'' [Obj ''p1'', Obj ''c3'', Obj ''G''],
 
-  PAction ''0_choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
-  PAction ''1_drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G''],
+  PAction ''0choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
+  PAction ''1drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G''],
 
-  PAction ''0_Goal_______'' []
+  PAction ''0Goal_______'' []
 ]"
 
 (* if you choose the wrong plan action at one point, this tells you where *)

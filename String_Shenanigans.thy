@@ -116,70 +116,66 @@ definition pad_strings :: "string list \<Rightarrow> string list" where
 
 (* nat upto *)
 
-fun nat_upto_help :: "nat \<Rightarrow> nat list \<Rightarrow> nat list" where
-  "nat_upto_help 0 build = 0 # build" |
-  "nat_upto_help (Suc n) build = nat_upto_help n (Suc n # build)"
+fun nat_range_help :: "nat \<Rightarrow> nat list \<Rightarrow> nat list" where
+  "nat_range_help 0 build = build" |
+  "nat_range_help (Suc n) build = nat_range_help n (n # build)"
 
-definition "nat_upto n \<equiv> nat_upto_help n []"
+definition "nat_range n \<equiv> nat_range_help n []"
 
-lemma nat_upto_help_length: "length (nat_upto_help n xs) = n + 1 + length xs"
+lemma nat_range_help_len: "length (nat_range_help n xs) = n + length xs"
   by (induction n arbitrary: xs) simp_all
 
-lemma nat_upto_length [simp]: "length (nat_upto n) = n + 1"
-  unfolding nat_upto_def using nat_upto_help_length by simp
+lemma nat_range_length [simp]: "length (nat_range n) = n"
+  using nat_range_def nat_range_help_len by simp
 
-lemma nat_upto_help_aux: "nat_upto_help n (xs@ys) = nat_upto_help n xs @ ys"
-proof (induction n arbitrary: xs)
-  case (Suc n)
-  have "nat_upto_help (Suc n) (xs @ ys) = nat_upto_help n ((Suc n # xs) @ ys)" by simp
-  also have "... = nat_upto_help n (Suc n # xs) @ ys" using Suc.IH by blast
-  also have "... = nat_upto_help (Suc n) xs @ ys" by simp
-  finally show ?case by simp
-qed simp
+lemma nat_range_help_aux: "nat_range_help n (xs @ ys) = nat_range_help n xs @ ys"
+  by (induction n xs rule: nat_range_help.induct) simp_all
 
-lemma "(xs @ [y]) ! length xs = y" by simp
+lemma nat_range_help_nth: assumes "i < n" shows "nat_range_help n xs ! i = i"
+  using assms proof (induction n xs rule: nat_range_help.induct)
+  case (2 n xs)
+  then consider "i < n" | (eq) "i = n" by linarith
+  thus ?case proof (cases)
+    case eq
+    have "nat_range_help (Suc n) xs = nat_range_help n ([] @ (n # xs))"
+      by simp
+    also have "... = nat_range_help n [] @ (n # xs)"
+      using nat_range_help_aux by metis
+    also have "i = length (nat_range_help n [])"
+      using nat_range_help_len eq by simp
+    ultimately show ?thesis using eq
+      by (metis nth_append_length)
+  qed (simp add: 2)
+qed simp_all
 
-lemma nat_upto_help_nth: assumes "i \<le> n" shows "nat_upto_help n xs ! i = i"
-using assms proof (induction n arbitrary: i xs)
-  case (Suc n)
-  then consider "i \<le> n" | "i = Suc n" using le_SucE by blast
-  thus ?case
-  proof (cases)
-    case 2
-    have "nat_upto_help (Suc n) xs = nat_upto_help n ([] @ (Suc n # xs))" by simp
-    also have "... = nat_upto_help n [] @ (Suc n # xs)" using nat_upto_help_aux by metis
-    finally have "nat_upto_help (Suc n) xs ! i = (nat_upto_help n [] @ (Suc n # xs)) ! (length (nat_upto_help n []))"
-      using 2 nat_upto_help_length by simp
-    thus ?thesis using 2 by simp
-  qed (simp add: Suc)
-qed simp
+lemma nat_range_nth [simp]: assumes "i < n" shows "nat_range n ! i = i"
+  using assms nat_range_help_nth nat_range_def by simp
 
-lemma nat_upto_nth [simp]: assumes "i \<le> n" shows "nat_upto n ! i = i"
-  using assms nat_upto_help_nth nat_upto_def by simp
+lemma nat_range_zero[simp]: "nat_range 0 = []"
+  unfolding nat_range_def by simp
 
-lemma nat_upto_snoc: "nat_upto (Suc n) = nat_upto n @ [Suc n]"
-  unfolding nat_upto_def
-  apply simp using nat_upto_help_aux
-  by (metis eq_Nil_appendI)
+lemma nat_range_snoc[simp]: "nat_range (Suc n) = nat_range n @ [n]"
+  unfolding nat_range_def nat_range_help.simps
+  using nat_range_help_aux by (metis eq_Nil_appendI)
 
+lemmas nat_range_simps = nat_range_zero nat_range_snoc
 
-lemma nat_upto_prefix: "prefix (nat_upto n) (nat_upto (n+k))"
+lemma nat_range_prefix: "prefix (nat_range n) (nat_range (n+k))"
   apply (induction k)
    apply simp
   apply (subst add_Suc_right)
-  apply (subst nat_upto_snoc)
+  apply (subst nat_range_snoc)
   using prefix_def by auto
 
-lemma nat_upto_distinct: "distinct (nat_upto n)"
+lemma nat_range_dist: "distinct (nat_range n)"
 proof -
-  have "nat_upto n ! i \<noteq> nat_upto n ! j" if "i \<noteq> j" "i \<le> n" "j \<le> n" for i j
-    using nat_upto_nth that by simp
-  moreover have "i \<le> n \<longleftrightarrow> i < length (nat_upto n)" for i by auto
+  have "nat_range n ! i \<noteq> nat_range n ! j" if "i \<noteq> j" "i < n" "j < n" for i j
+    using nat_range_nth that by simp
+  moreover have "i < n \<longleftrightarrow> i < length (nat_range n)" for i by auto
   ultimately show ?thesis using distinct_conv_nth by blast
 qed
 
-definition "unique_string (i::nat) \<equiv> show i"
-definition "distinct_strings n \<equiv> map unique_string (case n of 0 \<Rightarrow> [] | Suc m \<Rightarrow> nat_upto m)"
+definition "distinct_strings n \<equiv> map show (nat_range n)"
 
 (* TODO: https://isabelle.zulipchat.com/#narrow/channel/238552-Beginner-Questions/topic/String.20inequality.20with.20show/near/500270718*)
 lemma show_nat_inj: fixes a :: nat and b :: nat assumes "a \<noteq> b" shows "show a \<noteq> show b"
@@ -188,17 +184,25 @@ lemma show_nat_inj: fixes a :: nat and b :: nat assumes "a \<noteq> b" shows "sh
 (* TODO *)
 lemma notin_show_nat: "CHR ''_'' \<notin> set (show (n::nat))" sorry
 
+lemma nat_show_len_mono: "i \<le> j \<Longrightarrow> length (show i) \<le> length (show j)"
+  sorry
+
+
+
+
 lemma unique_str_bij:
-  "i \<noteq> j \<longleftrightarrow> unique_string i \<noteq> unique_string j"
-  using unique_string_def show_nat_inj by auto
+  fixes i :: nat and j :: nat
+  shows "i \<noteq> j \<longleftrightarrow> show i \<noteq> show j"
+  using show_nat_inj by auto
 
 lemma distinct_str_length [simp]: "length (distinct_strings n) = n"
   unfolding distinct_strings_def
   by (cases n) simp_all
 
 lemma distinct_strings_nth [simp]:
-  assumes "i < n" shows "distinct_strings n ! i = unique_string i"
-  unfolding distinct_strings_def using assms by (cases n) simp_all
+  assumes "i < n" shows "distinct_strings n ! i = show i"
+  unfolding distinct_strings_def using assms
+  by (metis nat_range_length nat_range_nth nth_map)
 
 lemma distinct_strings_dist:
   "distinct (distinct_strings n)"
@@ -206,25 +210,37 @@ lemma distinct_strings_dist:
 
 (* not sure how important those are *)
 
-lemma distinct_strings_prefix: "prefix (distinct_strings n) (distinct_strings (n+k))"
+lemma distinct_strings_max_len:
+  assumes "m \<le> n"
+  shows "\<forall>x \<in> set (distinct_strings m). length x \<le> length (show n)"
   unfolding distinct_strings_def
-  apply (simp split: nat.splits)
-  using nat_upto_prefix map_mono_prefix by metis
+using assms proof (induction n arbitrary: m)
+  case (Suc n)
+  have "set (distinct_strings (Suc n)) = insert (show n) (set (distinct_strings n))"
+    unfolding distinct_strings_def nat_range_simps by force
+  moreover have "length (show n) \<le> length (show (Suc n))"
+    using nat_show_len_mono
+    by (metis Suc_n_not_le_n nat_le_linear)
+  ultimately show ?case using Suc (* TODO simplify *)
+    by (metis (mono_tags, lifting) Suc_le_mono distinct_strings_def dual_order.trans insertE le_SucE)
+qed simp
+
+lemma distinct_strings_prefix: "prefix (distinct_strings n) (distinct_strings (n+k))"
+  using distinct_strings_def nat_range_prefix map_mono_prefix by metis
 
 lemma distinct_strings_padded:
   shows "distinct (map (pad k) (distinct_strings n))"
 proof -
   let ?d = "distinct_strings n"
-  {
-    fix i j
-    assume a: "i < length ?d" "j < length ?d" "i \<noteq> j"
-    hence notin: "CHR ''_'' \<notin> set (?d ! i)" "CHR ''_'' \<notin> set (?d ! j)"
-      using distinct_strings_def unique_string_def notin_show_nat list_ball_nth by simp_all
-    from a have  "?d ! i \<noteq> ?d ! j" using distinct_strings_dist distinct_conv_nth by metis
+  have "map (pad k) ?d ! i \<noteq> map (pad k) ?d ! j"
+    if "i < length ?d" "j < length ?d" "i \<noteq> j" for i j
+  proof -
+    from that have notin: "CHR ''_'' \<notin> set (?d ! i)" "CHR ''_'' \<notin> set (?d ! j)"
+      using distinct_strings_def notin_show_nat list_ball_nth by simp_all
+    from that have  "?d ! i \<noteq> ?d ! j" using distinct_strings_dist distinct_conv_nth by metis
     hence "pad k (?d ! i) \<noteq> pad k (?d ! j)" using pad_neq notin by simp
-    hence "map (pad k) (distinct_strings n) ! i \<noteq> map (pad k) (distinct_strings n) ! j"
-      using a by auto
-  }
+    thus ?thesis using that by auto
+  qed
   thus ?thesis using distinct_conv_nth by force
 qed
 

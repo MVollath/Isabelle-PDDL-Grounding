@@ -107,9 +107,28 @@ lemma (in wf_ast_problem) achievable_predAtm:
   using wf_I wf_plan_action_path wf_world_model_def
   unfolding wf_fmla_atom_alt by meson
 
+(* grounded PDDL *)
 
+text \<open>
+  Types, constants and objects don't really matter for grounded PDDL: they can just be ignored.
+  But for completeness' sake, they are restricted to be empty in grounded PDDL.
+\<close>
 
+fun grounded_pred :: "predicate_decl \<Rightarrow> bool" where
+  "grounded_pred (PredDecl n args) \<longleftrightarrow> args = []"
 
+fun grounded_ac :: "ast_action_schema \<Rightarrow> bool" where
+  "grounded_ac (Action_Schema n params pre effs) \<longleftrightarrow> params = []"
+
+definition (in ast_domain) "grounded_dom \<equiv>
+  types D = [] \<and>
+  list_all1 grounded_pred (predicates D) \<and>
+  consts D = [] \<and>
+  list_all1 grounded_ac (actions D)"
+
+definition (in ast_problem) "grounded_prob \<equiv>
+  grounded_dom \<and>
+  objects P = []"
 
 
 
