@@ -228,13 +228,22 @@ qed simp
 lemma distinct_strings_prefix: "prefix (distinct_strings n) (distinct_strings (n+k))"
   using distinct_strings_def nat_range_prefix map_mono_prefix by metis
 
+lemma pad_show_neq:
+  fixes i j :: nat
+  assumes "i \<noteq> j"
+  shows "padl k (show i) \<noteq> padl k (show j)"
+  using assms padl_neq notin_show_nat show_nat_inj by simp
+
+(* TODO pull inner if i neq j out to generalize for when map isn't explicitly used *)
 lemma distinct_strings_padded:
   shows "distinct (map (padl k) (distinct_strings n))"
 proof -
   let ?d = "distinct_strings n"
   have "map (padl k) ?d ! i \<noteq> map (padl k) ?d ! j"
     if "i < length ?d" "j < length ?d" "i \<noteq> j" for i j
+    using that distinct_strings_dist distinct_conv_nth list_ball_nth
   proof -
+    (* TODO simplify with pad_show_neq *)
     from that have notin: "CHR ''_'' \<notin> set (?d ! i)" "CHR ''_'' \<notin> set (?d ! j)"
       using distinct_strings_def notin_show_nat list_ball_nth by simp_all
     from that have  "?d ! i \<noteq> ?d ! j" using distinct_strings_dist distinct_conv_nth by metis
