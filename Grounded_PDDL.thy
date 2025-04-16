@@ -47,7 +47,7 @@ abbreviation "gr_pred_ids \<equiv> map2 ground_pred facts fact_ids"
 definition "fact_map \<equiv> map_of (zip (map un_Atom facts) gr_pred_ids)"
 
 fun map_fact :: "object atom \<Rightarrow> 'a atom" where
-  "map_fact a = predAtm (the (fact_map a)) []"
+  "map_fact a = predAtm (the (fact_map a)) []" (* TODO: what about Eq? *)
 
 (* fun grounded_pred_decl :: "facty \<Rightarrow> nat \<Rightarrow> predicate_decl" where
   "grounded_pred_decl f i = PredDecl (grounded_pred f i) []" *)
@@ -61,7 +61,7 @@ fun ga_eff :: "ground_action \<Rightarrow> term ast_effect" where
 
 fun ground_ac_name :: "plan_action \<Rightarrow> nat \<Rightarrow> string" where
   "ground_ac_name (PAction n args) i =
-    pad op_prefix_pad (show i) @ (CHR ''/'' # n) @ ((CHR ''-'' # arg_str args))"
+    padl op_prefix_pad (show i) @ (CHR ''/'' # n) @ ((CHR ''-'' # arg_str args))"
 
 definition ground_ac :: "plan_action \<Rightarrow> nat \<Rightarrow> ast_action_schema" where
   "ground_ac \<pi> i =
@@ -93,6 +93,10 @@ abbreviation restore_ground_plan :: "plan_action list \<Rightarrow> plan_action 
 
 end
 
+definition "covered \<phi> facts \<equiv> \<forall>a \<in> atoms \<phi>. is_predAtm a \<longrightarrow> Atom a \<in> set facts"
+
+text \<open>Some of these may follow from one another\<close>
+
 locale wf_grounder = grounder +
   assumes
     wf_problem and
@@ -100,8 +104,19 @@ locale wf_grounder = grounder +
     all_facts: "set facts \<supseteq> {a. achievable a}" and
     facts_wf: "list_all1 (wf_fmla_atom objT) facts" and (* If "set facts = {a. achievable a}", this follows. *)
     ops_dist: "distinct ops" and
-    ops_correct: "set ops \<supseteq> {\<pi>. applicable \<pi>}" and
-    ops_wf: "list_all1 wf_plan_action ops" (* If "set ops = {\<pi>. applicable \<pi>}", this follows. *)
+    all_ops: "set ops \<supseteq> {\<pi>. applicable \<pi>}" and
+    (* If "set ops = {\<pi>. applicable \<pi>}", this follows. *)
+    ops_wf: "list_all1 wf_plan_action ops" and
+    (* So does this: *)
+    effs_covered: "\<forall>\<pi> \<in> set ops. (let eff = effect (resolve_instantiate \<pi>) in
+      \<forall>\<phi> \<in> set (adds eff @ dels eff). covered \<phi> facts)" and
+    (* This follows if, additionally, prec_normed_dom *)
+    pres_covered: "\<forall>\<pi> \<in> set ops. covered (precondition (resolve_instantiate \<pi>)) facts"
+
+text \<open>
+The last two conditions can be satisfied by instantiating every \<pi>\<in>ops and adding all missing atoms
+to \<open>facts\<close>. I don't need to implement this for my grounder, but you are welcome to.
+\<close>
 
 abbreviation (in grounder) "D\<^sub>G \<equiv> ground_dom"
 abbreviation (in grounder) "P\<^sub>G \<equiv> ground_prob"
@@ -193,13 +208,13 @@ subsection \<open> Well-formedness \<close>
 context grounder begin
 end
 
-(* TODO \<rightarrow> Utils *)
+(* TODO \<rightarrow> Utils, if I end up using it *)
 lemma map2_obtain:
   assumes "z \<in> set (map2 f xs ys)"
   obtains x y where "z = f x y" "x \<in> set xs" "y \<in> set ys"
   using assms by (induction xs ys rule: list_induct2') auto
 
-(* TODO \<rightarrow> Utils *)
+(* TODO \<rightarrow> Utils, if I ned up using it *)
 lemma map2_dist_2:
   assumes "distinct ys" "\<And>x1 x2 y1 y2. y1 \<in> set ys \<Longrightarrow> y2 \<in> set ys \<Longrightarrow> y1 \<noteq> y2 \<Longrightarrow> f x1 y1 \<noteq> f x2 y2"
   shows "distinct (map2 f xs ys)"
@@ -213,12 +228,11 @@ context wf_grounder begin
 
 lemma gr_preds_dis: "distinct (map pred (predicates D\<^sub>G))"
 proof -
-
   have "gr_pred_ids ! i \<noteq> gr_pred_ids ! j" if "i \<noteq> j" "i < length (gr_pred_ids)" "j < length (gr_pred_ids)" for i j
   proof -
     have len: "length gr_pred_ids = length facts"
       unfolding fact_ids_def using nat_range_length by simp
-    hence nth: "gr_pred_ids ! x = ground_pred (facts ! x) x" if "x < length facts" for x
+    have nth: "gr_pred_ids ! x = ground_pred (facts ! x) x" if "x < length facts" for x
       unfolding fact_ids_def using that nat_range_nth by simp
 
     have "is_predAtom (facts ! x)" if "x < length facts" for x
@@ -238,11 +252,115 @@ proof -
 qed
 
 lemma gr_preds_wf: "list_all1 pg.wf_predicate_decl (predicates D\<^sub>G)"
-  sorry
+  unfolding ground_dom_sel pg.wf_predicate_decl_alt by simp
+
 lemma gr_acs_dis: "distinct (map ac_name (actions D\<^sub>G))"
-  sorry
+proof -
+  have len: "length (actions D\<^sub>G) = length ops"
+    unfolding ground_dom_sel op_ids_def using nat_range_length by simp
+  hence "actions D\<^sub>G ! i = ground_ac (ops ! i) i" if "i < length (actions D\<^sub>G)" for i
+    using that nat_range_nth op_ids_def by simp
+  hence nam: "\<exists>\<pi>. ac_name ((actions D\<^sub>G) ! i) = ground_ac_name \<pi> i" if "i < length (actions D\<^sub>G)" for i
+    using that by auto
+
+  have neq: "ground_ac_name \<pi> i \<noteq> ground_ac_name \<pi>' j"
+    if "i \<noteq> j" "i < length ops" "j < length ops" for i j \<pi> \<pi>'
+  proof -
+    have app: "\<exists>s. ground_ac_name \<pi> x = padl op_prefix_pad (show x) @ s" for x \<pi>
+      by (cases \<pi>) simp
+    have "length (padl op_prefix_pad (show x)) = op_prefix_pad" if "x < length ops" for x
+      using that op_prefix_pad_def padl_length nat_show_len_mono
+      using order_less_imp_le by metis
+    hence "padl op_prefix_pad (show i) @ s \<noteq> padl op_prefix_pad (show j) @ t" for s t
+      using that pad_show_neq by simp
+    thus ?thesis using that app by metis
+  qed
+
+  show ?thesis
+    unfolding distinct_conv_nth
+    using nth_map length_map nam neq len by metis
+qed
+
+thm ops_wf
+
+lemma wf_ops_resinst:
+  "\<forall>\<pi> \<in> set ops. wf_ground_action (resolve_instantiate \<pi>)"
+  "\<forall>\<pi> \<in> set ops. wf_fmla objT (precondition (resolve_instantiate \<pi>))"
+  "\<forall>\<pi> \<in> set ops. wf_effect objT (effect (resolve_instantiate \<pi>))"
+  using ops_wf wf_resolve_instantiate wf_ground_action_alt by simp_all
+
+thm lookup_zip_idx_eq
+
+(* TODO Utils *)
+lemma lookup_zip: "length xs = length ys \<Longrightarrow> x \<in> set xs \<Longrightarrow> \<exists>y. map_of (zip xs ys) x = Some y \<and> y \<in> set ys"
+  by (induction xs ys rule: list_induct2) auto
+
+lemma gr_wf_atom:
+  assumes "Atom a \<in> set facts"
+  shows "dg.wf_atom tyt (map_fact a)"
+proof -
+  have len: "length facts = length gr_pred_ids" using fact_ids_def nat_range_length by simp
+  from assms have 1: "a \<in> set (map un_Atom facts)" by force
+  from assms len 1 obtain x where x: "fact_map a = Some x" "x \<in> set gr_pred_ids"
+    unfolding fact_map_def using lookup_zip length_map by metis
+  hence "map_fact a = predAtm x []" by simp
+  hence "dg.wf_atom tyt (map_fact a) \<longleftrightarrow> dg.sig x = Some []" by (cases "dg.sig x") simp_all
+  also have "... \<longleftrightarrow> PredDecl x [] \<in> set (predicates D\<^sub>G)"
+    by (metis dg.pred_resolve gr_preds_dis)
+  also have "... \<longleftrightarrow> x \<in> set gr_pred_ids" by force
+  finally show ?thesis using x(2) by simp
+qed
+
+lemma covered_fmla_wf:
+  assumes "covered \<phi> facts" "ast_domain.wf_fmla d tyt \<phi>"
+  shows "dg.wf_fmla tyt' (map_formula map_fact \<phi>)"
+proof -
+  {
+    fix a assume ain: "a \<in> atoms \<phi>"
+    hence "ast_domain.wf_atom d tyt a" using assms ast_domain.wf_fmla_alt by auto
+    hence "dg.wf_atom tyt' (map_fact a)"
+      apply (cases a) using gr_wf_atom assms covered_def
+      using ain atom.disc(1) apply blast
+      tr
+  }
+  thus ?thesis using dg.wf_fmla_alt by (induction \<phi>) auto
+qed
+
+(* TODO: I am here
+Next: for all atoms in an effect of \<pi>\<in>ops, those atoms are reachable and thus in facts.
+But wait... ops is a super set. So we need to modify the whole locale condition.
+Also not every atom in pre(\<pi>) needs to be reachable for \<pi> to be reachable BECAUSE we don't assume
+pre(pi) to be a conjunction...
+
+Gonna need to add:
+- Every predicate atom in each effect is in facts. This follows if pi is reachable, since then every
+atom in its effect is reachable as well. So for our pipeline, this works since we compute the exact
+set of reachables. If pi is in ops, it is reachable.
+- Every atom in the precondition is in facts. This follows if pi is reachable and normalized, since
+it is only applicable if all atoms of its precondition are satisfied in a reachable state s.
+
+
+I could modify the locale definition to instead assume facts = achievables & ops = applicables &
+preconds are normalized. But I like to keep the grounder as general as possible. 
+*)
+
+lemma
+  assumes "wf_fmla objT \<phi>" "False"
+  shows "pg.wf_fmla (ty_term Map.empty pg.constT) (map_formula map_fact \<phi>)"
+  oops
+
+lemma xd:
+  shows "pg.wf_action_schema (ground_ac \<pi> i)"
+proof -
+  have "pg.wf_fmla (ty_term Map.empty pg.constT) (map_formula map_fact (precondition (resolve_instantiate \<pi>)))"sorry
+  hence C1: "pg.wf_fmla (pg.ac_tyt (ground_ac \<pi> i)) (ac_pre (ground_ac \<pi> i))" using ga_pre_alt by simp
+  have C2: "pg.wf_effect (ty_term (map_of (ac_params (ground_ac \<pi> i))) pg.constT) (ac_eff (ground_ac \<pi> i))" sorry
+
+  from C1 C2 show ?thesis using pg.wf_action_schema_alt by simp
+qed
+
 lemma gr_acs_wf: "list_all1 pg.wf_action_schema (actions D\<^sub>G)"
-  sorry
+  using xd by auto
 
 theorem ground_dom_wf: "dg.wf_domain"
   unfolding dg.wf_domain_def apply (intro conjI)

@@ -1,5 +1,5 @@
 theory String_Shenanigans
-imports Main "Show.Show_Instances" "HOL-Library.Sublist"
+imports Main Nat_Show_Utils "HOL-Library.Sublist"
 begin
 
 abbreviation max_length :: "'a list list \<Rightarrow> nat" where
@@ -176,19 +176,6 @@ proof -
 qed
 
 definition "distinct_strings n \<equiv> map show (nat_range n)"
-
-(* TODO: https://isabelle.zulipchat.com/#narrow/channel/238552-Beginner-Questions/topic/String.20inequality.20with.20show/near/500270718*)
-lemma show_nat_inj: fixes a :: nat and b :: nat assumes "a \<noteq> b" shows "show a \<noteq> show b"
-  using assms sorry
-
-(* TODO *)
-lemma notin_show_nat: "CHR ''_'' \<notin> set (show (n::nat))" sorry
-
-lemma nat_show_len_mono: "i \<le> j \<Longrightarrow> length (show i) \<le> length (show j)"
-  sorry
-
-
-
 
 lemma unique_str_bij:
   fixes i :: nat and j :: nat
