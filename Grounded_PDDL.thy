@@ -466,24 +466,31 @@ subsection \<open> Semantics \<close>
 
 text \<open> ground locale setup \<close>
 
-locale grounded_domain = wf_ast_domain +
+locale wf_grounded_domain = wf_ast_domain +
   assumes grounded_dom: grounded_dom
 
-locale grounded_problem = wf_ast_problem +
+locale wf_grounded_problem = wf_ast_problem +
   assumes grounded_prob: grounded_prob
 
-sublocale grounded_problem \<subseteq> grounded_domain D
+sublocale wf_grounded_problem \<subseteq> wf_grounded_domain D
   using grounded_prob grounded_prob_def by (unfold_locales) simp
 
+sublocale wf_grounder \<subseteq> dg: wf_grounded_domain ground_dom
+  using ground_dom_grounded
+  by unfold_locales simp
+
+sublocale wf_grounder \<subseteq> pg: wf_grounded_problem ground_prob
+  using ground_prob_grounded
+  by unfold_locales simp
 
 subsection \<open> Properties of grounded tasks \<close>
 
-lemma (in grounded_problem)
+lemma (in wf_grounded_problem)
   assumes "wf_plan_action (PAction n args)"
   shows "args = []"
   oops
 
-lemma (in grounded_problem)
+lemma (in wf_grounded_problem)
   assumes "wf_plan_action \<pi>"
   obtains ac where
     "ac \<in> set (actions D)"
@@ -503,7 +510,8 @@ lemmas pddl_ground_code =
   grounder.op_ids_def
   grounder.op_prefix_pad_def
   grounder.ground_pred.simps
-  grounder.map_fact.simps
+  grounder.fact_map_def
+  grounder.ground_fmla.simps
   grounder.ga_pre.simps
   grounder.ga_eff.simps
   grounder.ground_ac_def
