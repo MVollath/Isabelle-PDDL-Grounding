@@ -65,6 +65,8 @@ lemma notin_sublist_until:
   "x \<notin> set (sublist_until xs x)"
   by (induction xs) simp_all
 
+(* map *)
+
 lemma map_of_in_R_iff: "x \<in> fst ` set m \<longleftrightarrow> (\<exists>y. map_of m x = Some y)"
   by (metis map_of_eq_None_iff not_None_eq)
 
@@ -74,6 +76,7 @@ lemma map_of_single_val:
   using assms map_of_in_R_iff
   by (metis (full_types) case_prodD map_of_SomeD)
 
+(* TODO just use distinct_map *)
 lemma map_inj_dis:
   assumes "distinct xs" "inj f"
   shows "distinct (map f xs)"
@@ -113,11 +116,30 @@ proof - (* TODO how to apply contradiction correctly here? *)
   thus ?thesis using l by auto
 qed
 
+(* map2 *)
+
+lemma map2_obtain:
+  assumes "z \<in> set (map2 f xs ys)"
+  obtains x y where "z = f x y" "x \<in> set xs" "y \<in> set ys"
+  using assms by (induction xs ys rule: list_induct2') auto
+
+(* TODO, if I end up using it *)
+lemma map2_dist_2:
+  assumes "distinct ys" "\<And>x1 x2 y1 y2. y1 \<in> set ys \<Longrightarrow> y2 \<in> set ys \<Longrightarrow> y1 \<noteq> y2 \<Longrightarrow> f x1 y1 \<noteq> f x2 y2"
+  shows "distinct (map2 f xs ys)"
+  using assms proof (induction xs ys rule: list_induct2')
+  case (4 x xs y ys)
+  hence "distinct (map2 f xs ys)" by simp
+
+  thus ?case apply (induction xs ys rule: list_induct2') oops
+
+
 lemma drop_prefix:
   assumes "length xs = n" shows "drop n (xs @ ys) = ys"
   by (induction rule: list_induct_n[OF assms]) simp_all
 
-
+lemma "length xs = length ys \<Longrightarrow> distinct ys \<Longrightarrow> inj_on (map_of (zip xs ys)) (set xs)"
+  oops
 
 
 end
