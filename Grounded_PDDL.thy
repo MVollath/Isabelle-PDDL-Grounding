@@ -51,7 +51,7 @@ fun ground_fmla :: "object atom formula \<Rightarrow> 'a atom formula" where
   "ground_fmla (Atom (Eq a b)) = (if a = b then \<^bold>\<not>\<bottom> else \<bottom>)" |
   "ground_fmla (\<^bold>\<not> (Atom (Eq a b))) = (if a = b then \<bottom> else \<^bold>\<not>\<bottom>)" |
   "ground_fmla (Atom patm) = Atom (predAtm (the (fact_map (Atom patm))) [])" |
-  "ground_fmla (\<^bold>\<not> \<phi>) = ground_fmla \<phi>" | (* this one also coveres non-literal cases *)
+  "ground_fmla (\<^bold>\<not> \<phi>) = \<^bold>\<not> (ground_fmla \<phi>)" | (* this one also coveres non-literal cases *)
   (* conjunction *)
   "ground_fmla (\<phi> \<^bold>\<and> \<psi>) = ground_fmla \<phi> \<^bold>\<and> ground_fmla \<psi>" |
   (* covering formulas that don't satisfy \<open>is_conj\<close> *)
@@ -288,12 +288,6 @@ lemma wf_ops_resinst:
   "\<forall>\<pi> \<in> set ops. wf_effect objT (effect (resolve_instantiate \<pi>))"
   using ops_wf wf_resolve_instantiate wf_ground_action_alt by simp_all
 
-thm lookup_zip_idx_eq
-
-(* TODO Utils *)
-lemma lookup_zip: "length xs = length ys \<Longrightarrow> x \<in> set xs \<Longrightarrow> \<exists>y. map_of (zip xs ys) x = Some y \<and> y \<in> set ys"
-  by (induction xs ys rule: list_induct2) auto
-
 lemma gr_atom_wf:
   assumes "a \<in> set facts"
   shows "dg.wf_fmla_atom tyt (ground_fmla a)"
@@ -383,25 +377,6 @@ lemma "length xs = length ys \<Longrightarrow> distinct xs \<Longrightarrow> i <
 lemma "distinct xs \<Longrightarrow> i \<noteq> j \<Longrightarrow> i < length xs \<Longrightarrow> j < length xs \<Longrightarrow> xs ! i \<noteq> xs ! j"
   by (simp add: nth_eq_iff_index_eq)
 
-(* UTILS *)
-lemma mapof_distinct_zip_neq:
-  assumes "length xs = length ys" "distinct xs" "distinct ys" "a \<in> set xs" "b \<in> set xs" "a \<noteq> b"
-  shows "the (map_of (zip xs ys) a) \<noteq> the (map_of (zip xs ys) b)"
-proof -
-  from assms obtain i j where 1: "xs ! i = a" "xs ! j = b" "i < length xs" "j < length xs" "i \<noteq> j"
-    by (metis distinct_Ex1)
-  with assms have "map_of (zip xs ys) a = Some (ys ! i)" "map_of (zip xs ys) b = Some (ys ! j)"
-    using map_of_zip_nth by metis+
-  thus ?thesis using 1 assms nth_eq_iff_index_eq by auto
-qed
-
-(* UTILS *)
-lemma mapof_distinct_zip_distinct:
-  assumes "length xs = length ys" "distinct xs" "distinct ys" "distinct as" "set as \<subseteq> set xs"
-  shows "distinct (map (the \<circ> map_of (zip xs ys)) as)"
-  using assms apply (induction as) apply simp
-  using mapof_distinct_zip_neq by fastforce
-
 lemma (in wf_ast_problem) init_achievable:
   "\<forall>a \<in> set (init P). achievable a"
 proof -
@@ -488,15 +463,78 @@ subsection \<open> Properties of grounded tasks \<close>
 lemma (in wf_grounded_problem)
   assumes "wf_plan_action (PAction n args)"
   shows "args = []"
-  oops
+proof -
+  from assms obtain ac where "ac \<in> set (actions D)" "action_params_match ac args"
+    using wf_pa_refs_ac by metis
+  moreover hence "ac_params ac = []" using grounded_dom
+    by (metis ast_action_schema.collapse grounded_ac.simps grounded_dom_def)
+  ultimately show ?thesis using action_params_match_def by simp
+qed
 
-lemma (in wf_grounded_problem)
-  assumes "wf_plan_action \<pi>"
-  obtains ac where
-    "ac \<in> set (actions D)"
-    "wf_plan_action (PAction n [])"
-    "resolve_instantiate \<pi> = instantiate_action_schema ac []"
-  oops
+
+subsection \<open> Grounder Semantics \<close>
+
+context grounder begin
+
+lemma gr_predAtom: "is_predAtom a \<Longrightarrow> is_predAtom (ground_fmla a)"
+  by (cases a rule: is_predAtom.cases) simp_all
+
+end
+
+context wf_grounder begin
+
+lemma "is_predAtom a \<Longrightarrow> covered a facts \<longleftrightarrow> a \<in> set facts"
+  unfolding covered_def by (cases a rule: is_predAtom.cases) simp_all
+
+(* can't easily apply mapof_zip_inj here due to the recursive nature of ground_fmla_inj *)
+lemma ground_fmla_inj: "inj_on ground_fmla (set facts)"
+proof -
+  {
+    fix a b
+    assume assms: "a \<in> set facts" "b \<in> set facts" "a \<noteq> b"
+    then obtain n args where a: "a = Atom (predAtm n args)"
+      using facts_wf wf_fmla_atom_alt by (cases a rule: is_predAtom.cases) auto
+    from assms obtain n' args' where b: "b = Atom (predAtm n' args')"
+      using facts_wf wf_fmla_atom_alt by (cases b rule: is_predAtom.cases) auto
+
+    note mapof_distinct_zip_neq[OF facts_len gr_pred_ids_dis assms]
+    hence "ground_fmla a \<noteq> ground_fmla b"
+      using a b fact_map_def by auto
+  }
+  thus ?thesis unfolding inj_on_def by fast
+qed
+
+lemma ground_fmla_inv:
+  defines "gr_fmla \<equiv> ground_fmla :: object atom formula \<Rightarrow> 'a atom formula"
+  assumes "M \<subseteq> set facts" "Atom (predAtm n args) \<in> set facts"
+  assumes "gr_fmla (Atom (predAtm n args)) \<in> gr_fmla ` M"
+  shows "Atom (predAtm n args) \<in> M"
+  using assms ground_fmla_inj inj_on_image_mem_iff by metis
+
+lemma ground_fmla_sem:
+  assumes "covered \<phi> facts" "M \<subseteq> set facts"
+  shows "M \<^sup>c\<TTurnstile>\<^sub>= \<phi> \<longleftrightarrow> ground_fmla ` M \<^sup>c\<TTurnstile>\<^sub>= ground_fmla \<phi>"
+proof -
+  have 1: "valuation M \<Turnstile> \<phi> \<longleftrightarrow> valuation (ground_fmla ` M) \<Turnstile> ground_fmla \<phi>"
+    using assms(1) unfolding covered_def valuation_def
+  proof (induction \<phi> rule: ground_fmla.induct)
+    case (4 p args)
+    hence cov: "Atom (predAtm p args) \<in> set facts" by simp
+    from 4 show ?case
+      using ground_fmla_inv[OF assms(2) cov] by force
+  next
+    case ("5_1" p args)
+    hence cov: "Atom (predAtm p args) \<in> set facts" by simp
+    from "5_1" show ?case
+      using ground_fmla_inv[OF assms(2) cov] by force
+  qed simp_all
+
+  have "wm_basic M" "wm_basic (ground_fmla ` M)"
+    using assms facts_wf wm_basic_def wf_fmla_atom_alt gr_predAtom by fast+
+  thus ?thesis using 1 valuation_iff_close_world by blast
+qed
+
+end
 
 
 

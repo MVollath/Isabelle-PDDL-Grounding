@@ -67,15 +67,6 @@ lemma notin_sublist_until:
 
 (* map *)
 
-lemma map_of_in_R_iff: "x \<in> fst ` set m \<longleftrightarrow> (\<exists>y. map_of m x = Some y)"
-  by (metis map_of_eq_None_iff not_None_eq)
-
-lemma map_of_single_val:
-  assumes "\<forall>(x, y) \<in> set m. y = z"
-  shows "x \<in> fst ` set m \<longleftrightarrow> map_of m x = Some z"
-  using assms map_of_in_R_iff
-  by (metis (full_types) case_prodD map_of_SomeD)
-
 (* TODO just use distinct_map *)
 lemma map_inj_dis:
   assumes "distinct xs" "inj f"
@@ -138,8 +129,45 @@ lemma drop_prefix:
   assumes "length xs = n" shows "drop n (xs @ ys) = ys"
   by (induction rule: list_induct_n[OF assms]) simp_all
 
-lemma "length xs = length ys \<Longrightarrow> distinct ys \<Longrightarrow> inj_on (map_of (zip xs ys)) (set xs)"
-  oops
+(* map_of *)
 
+lemma map_of_in_L_iff: "x \<in> fst ` set m \<longleftrightarrow> (\<exists>y. map_of m x = Some y)"
+  by (metis map_of_eq_None_iff not_None_eq)
 
+lemma map_of_single_val:
+  assumes "\<forall>(x, y) \<in> set m. y = z"
+  shows "x \<in> fst ` set m \<longleftrightarrow> map_of m x = Some z"
+  using assms map_of_in_L_iff
+  by (metis (full_types) case_prodD map_of_SomeD)
+
+lemma lookup_zip: "length xs = length ys \<Longrightarrow> x \<in> set xs \<Longrightarrow> \<exists>y. map_of (zip xs ys) x = Some y \<and> y \<in> set ys"
+  by (induction xs ys rule: list_induct2) auto
+
+lemma mapof_distinct_zip_neq:
+  assumes "length xs = length ys" "distinct ys" "a \<in> set xs" "b \<in> set xs" "a \<noteq> b"
+  shows "the (map_of (zip xs ys) a) \<noteq> the (map_of (zip xs ys) b)"
+proof -
+  from assms obtain y where y: "(a, y) \<in> set (zip xs ys)" "map_of (zip xs ys) a = Some y"
+    by (meson lookup_zip map_of_SomeD)
+  from assms obtain z where z: "(b, z) \<in> set (zip xs ys)" "map_of (zip xs ys) b = Some z"
+    by (meson lookup_zip map_of_SomeD)
+  from y assms(1) obtain i where i: "i < length xs" "xs ! i = a" "ys ! i = y"
+    by (metis fst_eqD in_set_zip sndI)
+  from z assms(1) obtain j where j: "j < length xs" "xs ! j = b" "ys ! j = z"
+    by (metis fst_eqD in_set_zip sndI)
+
+  from y z i j assms show ?thesis using nth_eq_iff_index_eq by auto
+qed
+
+(* the second statement is weaker but follows from the first and assms in a complex way *)
+lemma mapof_zip_inj:
+  assumes "length xs = length ys" "distinct ys"
+  shows "inj_on (the \<circ> map_of (zip xs ys)) (set xs)" "inj_on (map_of (zip xs ys)) (set xs)"
+  using assms inj_on_def mapof_distinct_zip_neq by fastforce+
+
+lemma mapof_distinct_zip_distinct:
+  assumes "length xs = length ys" "distinct xs" "distinct ys" "distinct as" "set as \<subseteq> set xs"
+  shows "distinct (map (the \<circ> map_of (zip xs ys)) as)"
+  using assms mapof_zip_inj(1)
+  using distinct_map inj_on_subset by blast
 end
