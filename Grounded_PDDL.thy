@@ -61,10 +61,12 @@ fun ground_fmla :: "object atom formula \<Rightarrow> 'a atom formula" where
 (* fun grounded_pred_decl :: "facty \<Rightarrow> nat \<Rightarrow> predicate_decl" where
   "grounded_pred_decl f i = PredDecl (grounded_pred f i) []" *)
 
-fun ga_pre :: "ground_action \<Rightarrow> term atom formula" where
+(* in code, 'a=term. In proofs, 'a can be object, too *)
+fun ga_pre :: "ground_action \<Rightarrow> 'a atom formula" where
   "ga_pre (Ground_Action pre eff) = ground_fmla pre"
 
-fun ga_eff :: "ground_action \<Rightarrow> term ast_effect" where
+(* in code, 'a=term. In proofs, 'a can be object, too *)
+fun ga_eff :: "ground_action \<Rightarrow> 'a ast_effect" where
   "ga_eff (Ground_Action pre (Effect a d)) =
     Effect (map ground_fmla a) (map ground_fmla d)"
 
@@ -149,9 +151,11 @@ lemma ground_pred_cond:
   (\<exists>s. ground_pred a i = Pred (padl fact_prefix_pad (show i) @ s))"
   by (cases a rule: is_predAtom.cases) simp_all
 
+(* TODO: this is useless as is. Split it into variants for object and term *)
 lemma ga_pre_alt: "ga_pre ga = ground_fmla (precondition ga)"
   by (cases ga; simp)
 
+(* same. *)
 lemma ga_eff_alt: "ga_eff ga =
   Effect (map ground_fmla (adds (effect ga))) (map ground_fmla (dels (effect ga)))"
   by (cases ga rule: ga_eff.cases) simp
@@ -334,7 +338,10 @@ lemma ground_ac_wf:
 proof -
   have "pg.wf_fmla tyt (ground_fmla (precondition (resolve_instantiate \<pi>)))" for tyt
     using assms pres_covered ground_fmla_wf by auto
-  hence C1: "pg.wf_fmla (pg.ac_tyt (ground_ac \<pi> i)) (ac_pre (ground_ac \<pi> i))" using ga_pre_alt by simp
+  moreover have "ac_pre (ground_ac \<pi> i) = ground_fmla (precondition (resolve_instantiate \<pi>))"
+    unfolding ground_ac_sel apply (cases "resolve_instantiate \<pi>") by simp
+  ultimately have C1: "pg.wf_fmla (pg.ac_tyt (ground_ac \<pi> i)) (ac_pre (ground_ac \<pi> i))"
+    by simp
 
   (* TODO simplify *)
   from assms have "wf_plan_action \<pi>" using ops_wf by simp
@@ -547,6 +554,46 @@ lemma ground_goal_sem:
 (* only used in proofs, not in code *)
 definition (in grounder) "op_map_inv \<equiv> map_of (zip ops gr_ac_names)"
 definition (in grounder) "ground_pa \<pi> \<equiv> PAction (the (op_map_inv \<pi>)) []"
+
+(* (let ga = resolve_instantiate \<pi> in
+    Action_Schema (ground_ac_name \<pi> i) [] (ga_pre ga) (ga_eff ga))" *)
+
+type_synonym gr_fmla_term = "object atom formula \<Rightarrow> term atom formula"
+type_synonym gr_fmla_obj = "object atom formula \<Rightarrow> object atom formula"
+
+term "map_formula (map_atom (subst_term t)) ((ground_fmla :: gr_fmla_term)  \<phi>)"
+term "ground_fmla \<phi>"
+
+(* careful: two different type instances of ground_fmla.
+  On the left side to 'term atom formula', on the right to 'object atom formula' *)
+lemma ground_fmla_subst:
+  "map_formula (map_atom (subst_term t)) (ground_fmla \<phi>)
+    = ground_fmla \<phi>"
+  sorry
+
+(* careful: two different type instance of ga_eff.
+  On the left side to 'term ast_effect', on the right to 'object ast_effect' *)
+lemma ground_effect_subst:
+  "map_ast_effect (subst_term t) (ga_eff ga)
+    = ga_eff ga"
+  apply (cases ga rule: ga_eff.cases; simp)
+  using ground_fmla_subst by simp
+
+lemma gr_pa_instantiation:
+  shows "instantiate_action_schema (ground_ac \<pi> i) [] =
+    (let ga = resolve_instantiate \<pi> in
+      Ground_Action (ga_pre ga) (ga_eff ga))"
+  unfolding ground_ac_def
+  apply (cases "resolve_instantiate \<pi>"; cases \<pi>; simp)
+    using ground_fmla_subst ground_effect_subst by simp
+(*proof -
+  define ga where ga: "ga = resolve_instantiate \<pi>"
+  have "pg.instantiate_action_schema
+     (Action_Schema (ground_ac_name \<pi> i) [] (ga_pre ga) (ga_eff ga))
+     [] =
+    (Ground_Action (ga_pre ga) (ga_eff ga))"
+
+  unfolding ground_ac_def*)
 
 lemma ground_enabled_iff:
   assumes "M \<subseteq> set facts" "\<pi> \<in> set ops"
