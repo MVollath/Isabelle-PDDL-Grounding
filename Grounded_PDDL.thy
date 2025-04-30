@@ -92,10 +92,10 @@ definition ground_prob :: "ast_problem" where
     (ground_fmla (goal P))"
 
 abbreviation "gr_ac_names \<equiv> map2 ground_ac_name ops op_ids"
-definition "pa_map \<equiv> map_of (zip gr_ac_names ops)"
+definition "op_map \<equiv> map_of (zip gr_ac_names ops)"
 
 fun restore_ground_pa :: "plan_action \<Rightarrow> plan_action" where
-  "restore_ground_pa (PAction n args) = the (pa_map n)"
+  "restore_ground_pa (PAction n args) = the (op_map n)"
 
 abbreviation restore_ground_plan :: "plan_action list \<Rightarrow> plan_action list" where
   "restore_ground_plan \<pi>s \<equiv> map restore_ground_pa \<pi>s"
@@ -182,7 +182,7 @@ lemma ground_prob_sel [simp]:
   "goal P\<^sub>G = ground_fmla (goal P)"
   unfolding ground_prob_def by simp_all
 
-lemma restore_ground_pa_alt: "restore_ground_pa \<pi> = the (pa_map (name \<pi>))"
+lemma restore_ground_pa_alt: "restore_ground_pa \<pi> = the (op_map (name \<pi>))"
   by (cases \<pi>) simp
 
 end
@@ -479,12 +479,17 @@ context grounder begin
 lemma gr_predAtom: "is_predAtom a \<Longrightarrow> is_predAtom (ground_fmla a)"
   by (cases a rule: is_predAtom.cases) simp_all
 
-end
-
-context wf_grounder begin
+lemma ground_init:
+  "pg.I = ground_fmla ` I"
+  unfolding ast_problem.I_def ground_prob_sel by simp
 
 lemma "is_predAtom a \<Longrightarrow> covered a facts \<longleftrightarrow> a \<in> set facts"
   unfolding covered_def by (cases a rule: is_predAtom.cases) simp_all
+
+
+end
+
+context wf_grounder begin
 
 (* can't easily apply mapof_zip_inj here due to the recursive nature of ground_fmla_inj *)
 lemma ground_fmla_inj: "inj_on ground_fmla (set facts)"
@@ -534,6 +539,26 @@ proof -
   thus ?thesis using 1 valuation_iff_close_world by blast
 qed
 
+lemma ground_goal_sem:
+  assumes "M \<subseteq> set facts"
+  shows "M \<^sup>c\<TTurnstile>\<^sub>= goal P \<longleftrightarrow> ground_fmla ` M \<^sup>c\<TTurnstile>\<^sub>= ground_fmla (goal P)"
+  using assms goal_covered ground_fmla_sem by blast
+
+(* only used in proofs, not in code *)
+definition (in grounder) "op_map_inv \<equiv> map_of (zip ops gr_ac_names)"
+definition (in grounder) "ground_pa \<pi> \<equiv> PAction (the (op_map_inv \<pi>)) []"
+
+lemma ground_enabled_iff:
+  assumes "M \<subseteq> set facts" "\<pi> \<in> set ops"
+  shows "plan_action_enabled \<pi> M \<longleftrightarrow> pg.plan_action_enabled (ground_pa \<pi>) (ground_fmla ` M)"
+proof
+  assume "plan_action_enabled \<pi> M"
+  thus "pg.plan_action_enabled (ground_pa \<pi>) (ground_fmla ` M)" sorry
+next
+  assume "pg.plan_action_enabled (ground_pa \<pi>) (ground_fmla ` M)"
+  thus "plan_action_enabled \<pi> M" sorry
+qed
+
 end
 
 
@@ -557,7 +582,7 @@ lemmas pddl_ground_code =
   grounder.ground_prob_def
   grounder.ground_ac_name.simps
   grounder.fact_map_def
-  grounder.pa_map_def
+  grounder.op_map_def
   grounder.restore_ground_pa.simps
 declare pddl_ground_code[code]
 
