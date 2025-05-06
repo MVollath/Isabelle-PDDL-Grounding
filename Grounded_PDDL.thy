@@ -609,43 +609,108 @@ lemma gr_pa_instantiation:
   using ground_fmla_subst ground_effect_subst
     by (cases "resolve_instantiate \<pi>") simp
 
-lemma
+lemma ground_action_map_entry:
+  assumes "\<pi> \<in> set ops"
+  obtains i where
+    "(\<pi>, ground_ac_name \<pi> i) \<in> set (zip ops op_names)"
+    "(ground_ac_name \<pi> i, \<pi>) \<in> set (zip op_names ops)"
+    "ground_ac \<pi> (ground_ac_name \<pi> i) \<in> set (actions D\<^sub>G)"
+proof -
+  from assms obtain i where i: "i < length ops" "ops ! i = \<pi>"
+    using in_set_conv_nth by meson
+  hence n: "op_names ! i = ground_ac_name \<pi> i"
+    unfolding op_names_def op_ids_def by simp
+  with i have "actions D\<^sub>G ! i = ground_ac \<pi> (ground_ac_name \<pi> i)"
+    unfolding ground_dom_sel using ops_len by simp
+  with i have a: "ground_ac \<pi> (ground_ac_name \<pi> i) \<in> set (actions D\<^sub>G)"
+    unfolding ground_dom_sel in_set_conv_nth
+    using ops_len by auto
+  (* TODO use thesis variable if it exists *)
+  from a n i show "(\<And>i. (\<pi>, ground_ac_name \<pi> i) \<in> set (zip ops op_names) \<Longrightarrow>
+          (ground_ac_name \<pi> i, \<pi>) \<in> set (zip op_names ops) \<Longrightarrow>
+          ground_ac \<pi> (ground_ac_name \<pi> i) \<in> set (actions D\<^sub>G) \<Longrightarrow> thesis) \<Longrightarrow>
+    thesis"
+    unfolding ground_dom_sel using ops_len
+    by (metis map_of_SomeD map_of_zip_nth op_names_dis ops_dist)
+qed
+
+lemma ground_action_map_entry':
   assumes "\<pi> \<in> set ops"
   obtains n where
-    "pg.resolve_action_schema (the (op_map_inv \<pi>)) = Some (ground_ac \<pi> n)"
-  oops
+    "(\<pi>, n) \<in> set (zip ops op_names)"
+    "(n, \<pi>) \<in> set (zip op_names ops)"
+    "ground_ac \<pi> n \<in> set (actions D\<^sub>G)"
+  using assms ground_action_map_entry by metis
 
-lemma
-  assumes "\<pi> \<in> set ops" "resolve_action_schema (name \<pi>) = Some ac"
-  shows "pg.resolve_instantiate (ground_pa (PAction n args)) =
-    Ground_Action undefined undefined"
+lemma resolve_ground_pa:
+  assumes "\<pi> \<in> set ops"
+  obtains n where
+    "dg.resolve_action_schema (name (ground_pa \<pi>)) = Some (ground_ac \<pi> n)"
+proof -
+  (* the (op_map_inv \<pi>) *)
+  from assms obtain n where n:
+    "(\<pi>, n) \<in> set (zip ops op_names)"
+    "ground_ac \<pi> n \<in> set (actions D\<^sub>G)"
+    using ground_action_map_entry' by metis
 
+  hence "op_map_inv \<pi> = Some n"
+    unfolding op_map_inv_def
+    using ops_dist ops_len by simp
+  (* TODO use thesis variable if it exists *)
+  with n show "(\<And>n. dg.resolve_action_schema (name (ground_pa \<pi>)) = Some (ground_ac \<pi> n) \<Longrightarrow> thesis) \<Longrightarrow> thesis"
+    unfolding dg.res_aux ground_ac_sel ground_pa_def by simp
+qed
+
+lemma resinst_ground_pa:
+  assumes "\<pi> \<in> set ops"
+  defines "ga \<equiv> resolve_instantiate \<pi>"
+  shows "pg.resolve_instantiate (ground_pa \<pi>) =
+    Ground_Action (ga_pre ga) (ga_eff ga)"
+  unfolding pg.resolve_instantiate_alt grounder.ground_prob_sel(1)
+  using assms resolve_ground_pa gr_pa_instantiation ground_pa_def
+  by (metis option.sel plan_action.sel)
 
 lemma ground_enabled_iff:
   assumes "M \<subseteq> set facts" "\<pi> \<in> set ops"
   shows "plan_action_enabled \<pi> M \<longleftrightarrow> pg.plan_action_enabled (ground_pa \<pi>) (ground_fmla ` M)"
-proof
-  assume 0: "plan_action_enabled \<pi> M"
-  obtain n args where pi [simp]: "\<pi> = PAction n args" by (cases \<pi>) simp
-  from 0 have 1: "wf_plan_action \<pi>" "M \<^sup>c\<TTurnstile>\<^sub>= precondition (resolve_instantiate \<pi>)"
-    using plan_action_enabled_def by auto
+    (is "?L \<longleftrightarrow> ?R")
+proof -
+  from assms obtain n where n:
+    "pg.resolve_action_schema (name (ground_pa \<pi>)) = Some (ground_ac \<pi> n)"
+    unfolding ground_prob_sel(1)
+    using resolve_ground_pa by meson
 
-  from 1 obtain ac where ac: "resolve_action_schema n = Some ac" "ac \<in> set (actions D)"
-    "ac_name ac = n" "action_params_match ac args"
-    using wf_pa_refs_ac by auto
+  from assms have pre_iff: "M \<^sup>c\<TTurnstile>\<^sub>= precondition (resolve_instantiate \<pi>) \<longleftrightarrow>
+    ground_fmla ` M \<^sup>c\<TTurnstile>\<^sub>= ground_fmla (precondition (resolve_instantiate \<pi>))"
+    using pres_covered ground_fmla_sem by blast
 
-  
+  show ?thesis proof
+    assume ?L
+    have C1: "pg.wf_plan_action (ground_pa \<pi>)"
+      unfolding pg.wf_plan_action_alt n apply simp
+      unfolding ground_pa_def plan_action.sel
+      unfolding pg.action_params_match_def by simp
 
-  thus "pg.plan_action_enabled (ground_pa \<pi>) (ground_fmla ` M)" sorry
-next
-  assume "pg.plan_action_enabled (ground_pa \<pi>) (ground_fmla ` M)"
-  thus "plan_action_enabled \<pi> M" sorry
+    have C2: "ground_fmla ` M \<^sup>c\<TTurnstile>\<^sub>= precondition (pg.resolve_instantiate (ground_pa \<pi>))"
+      unfolding resinst_ground_pa[OF assms(2)]
+      unfolding ground_action.sel ga_pre_alt
+      using \<open>?L\<close> pre_iff plan_action_enabled_def by blast
+    
+    from C1 C2 show ?R unfolding pg.plan_action_enabled_def ..
+  next
+    assume ?R
+    have C1: "wf_plan_action \<pi>" using assms ops_wf by blast
+    have C2: "M \<^sup>c\<TTurnstile>\<^sub>= precondition (resolve_instantiate \<pi>)"
+      using \<open>?R\<close>
+      unfolding pg.plan_action_enabled_def resinst_ground_pa[OF assms(2)]
+      unfolding ground_action.sel plan_action.sel ga_pre_alt
+      using pre_iff by blast
+
+    from C1 C2 show ?L unfolding plan_action_enabled_def ..
+  qed
 qed
 
 end
-
-
-
 
 
 subsection \<open> Code Setup \<close>
