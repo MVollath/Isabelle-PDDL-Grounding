@@ -409,6 +409,7 @@ lemma "length xs = length ys \<Longrightarrow> distinct xs \<Longrightarrow> i <
 lemma "distinct xs \<Longrightarrow> i \<noteq> j \<Longrightarrow> i < length xs \<Longrightarrow> j < length xs \<Longrightarrow> xs ! i \<noteq> xs ! j"
   by (simp add: nth_eq_iff_index_eq)
 
+(* TODO: move to normalization defs *)
 lemma (in wf_ast_problem) init_achievable:
   "\<forall>a \<in> set (init P). achievable a"
 proof -
@@ -515,7 +516,7 @@ lemma ground_init:
   "pg.I = ground_fmla ` I"
   unfolding ast_problem.I_def ground_prob_sel by simp
 
-lemma "is_predAtom a \<Longrightarrow> covered a facts \<longleftrightarrow> a \<in> set facts"
+lemma covered_predAtom: "is_predAtom a \<Longrightarrow> covered a facts \<longleftrightarrow> a \<in> set facts"
   unfolding covered_def by (cases a rule: is_predAtom.cases) simp_all
 
 
@@ -579,14 +580,6 @@ lemma ground_goal_sem:
 definition (in grounder) "op_map_inv \<equiv> map_of (zip ops op_names)"
 definition (in grounder) "ground_pa \<pi> \<equiv> PAction (the (op_map_inv \<pi>)) []"
 
-(* TODO delete this *)
-(* (let ga = resolve_instantiate \<pi> in
-    Action_Schema (ground_ac_name \<pi> i) [] (ga_pre ga) (ga_eff ga))" *)
-type_synonym gr_fmla_term = "object atom formula \<Rightarrow> term atom formula"
-type_synonym gr_fmla_obj = "object atom formula \<Rightarrow> object atom formula"
-term "map_formula (map_atom (subst_term t)) ((ground_fmla :: gr_fmla_term)  \<phi>)"
-term "ground_fmla \<phi>"
-
 (* careful: two different type instances of ground_fmla.
   On the left side to 'term atom formula', on the right to 'object atom formula' *)
 lemma ground_fmla_subst:
@@ -647,7 +640,6 @@ lemma resolve_ground_pa:
   obtains n where
     "dg.resolve_action_schema (name (ground_pa \<pi>)) = Some (ground_ac \<pi> n)"
 proof -
-  (* the (op_map_inv \<pi>) *)
   from assms obtain n where n:
     "(\<pi>, n) \<in> set (zip ops op_names)"
     "ground_ac \<pi> n \<in> set (actions D\<^sub>G)"
@@ -677,8 +669,7 @@ lemma ground_enabled_iff:
 proof -
   from assms obtain n where n:
     "pg.resolve_action_schema (name (ground_pa \<pi>)) = Some (ground_ac \<pi> n)"
-    unfolding ground_prob_sel(1)
-    using resolve_ground_pa by meson
+    unfolding ground_prob_sel(1) using resolve_ground_pa by meson
 
   from assms have pre_iff: "M \<^sup>c\<TTurnstile>\<^sub>= precondition (resolve_instantiate \<pi>) \<longleftrightarrow>
     ground_fmla ` M \<^sup>c\<TTurnstile>\<^sub>= ground_fmla (precondition (resolve_instantiate \<pi>))"
@@ -710,8 +701,117 @@ proof -
   qed
 qed
 
-end
+(* TODO: Utils, better name *)
+(* TODO check where this was needed in normalization *)
+lemma (in -) set_image_minus_un:
+  assumes "inj_on f (A \<union> B \<union> C \<union> D)"
+  shows "A - B \<union> C = D \<longleftrightarrow> f ` (A - B \<union> C) = f ` D"
+    "A - B \<union> C = D \<longleftrightarrow> f ` A - f ` B \<union> f ` C = f ` D"
+  using assms unfolding inj_on_def by blast+
 
+lemma effs_covered_alt:
+  assumes "\<pi> \<in> set ops"
+  shows "set (adds (effect (resolve_instantiate \<pi>))) \<union>
+    set (dels (effect (resolve_instantiate \<pi>))) \<subseteq> set facts"
+proof -
+  have "wf_ground_action (resolve_instantiate \<pi>)"
+    using assms ops_wf wf_resolve_instantiate by blast
+  thus ?thesis
+    unfolding wf_ground_action_alt wf_effect_alt wf_fmla_atom_alt
+    using effs_covered covered_predAtom
+    unfolding set_append Let_def using assms by blast
+qed
+
+lemma exec_covered:
+  assumes "M \<subseteq> set facts" "\<pi> \<in> set ops"
+  shows "execute_plan_action \<pi> M \<subseteq> set facts"
+  using assms effs_covered_alt
+  unfolding execute_plan_action_def apply_effect_alt by blast
+
+lemma i_covered: "I \<subseteq> set facts"
+  using all_facts
+  by (auto simp add: init_achievable subset_Collect_conv)
+
+lemma execs_covered:
+  assumes "M \<subseteq> set facts" "set \<pi>s \<subseteq> set ops"
+    "plan_action_path M \<pi>s M'"
+  shows "M' \<subseteq> set facts"
+using assms proof (induction \<pi>s arbitrary: M)
+  case (Cons \<pi> \<pi>s)
+  then obtain M'' where M'': "execute_plan_action \<pi> M = M''" "plan_action_path M'' \<pi>s M'"
+    by simp
+  with Cons show ?case using exec_covered
+    by (meson dual_order.trans list.set_intros(1) set_subset_Cons subsetD)
+qed simp
+
+lemma path_covered:
+  assumes "plan_action_path I \<pi>s M"
+  shows "M \<subseteq> set facts" "set \<pi>s \<subseteq> set ops"
+  using assms all_facts achievable_def apply auto[1]
+  using assms all_ops applicable_def by blast
+
+(* TODO split into \<Longrightarrow> and <==, where left side uses restore_pa *)
+lemma ground_action_exec_iff:
+  assumes "M \<subseteq> set facts" "\<pi> \<in> set ops" "M' \<subseteq> set facts" (* assms(3) only needed for <== *)
+  shows "execute_plan_action \<pi> M = M' \<longleftrightarrow>
+    pg.execute_plan_action (ground_pa \<pi>) (ground_fmla ` M) = ground_fmla ` M'"
+proof -
+  have injs: "inj_on ground_fmla (M \<union> set (dels (effect (resolve_instantiate \<pi>)))
+      \<union> set (adds (effect (resolve_instantiate \<pi>))) \<union> M')"
+    apply (rule inj_on_subset[of ground_fmla "set facts"])
+     apply (simp add: ground_fmla_inj)
+    using assms effs_covered_alt by fast
+
+  show ?thesis
+    unfolding ast_problem.execute_plan_action_def
+    unfolding resinst_ground_pa[OF assms(2)] ground_action.sel ga_eff_alt
+    unfolding apply_effect_alt ast_effect.sel
+    using set_image_minus_un(2)[OF injs] by simp
+qed
+
+lemma ground_action_exec_right:
+  assumes "M \<subseteq> set facts" "\<pi> \<in> set ops" "execute_plan_action \<pi> M = M'"
+  shows "pg.execute_plan_action (ground_pa \<pi>) (ground_fmla ` M) = ground_fmla ` M'"
+proof -
+  have injs: "inj_on ground_fmla (M \<union> set (dels (effect (resolve_instantiate \<pi>)))
+      \<union> set (adds (effect (resolve_instantiate \<pi>))) \<union> M')"
+    apply (rule inj_on_subset[of ground_fmla "set facts"])
+     apply (simp add: ground_fmla_inj)
+    using assms effs_covered_alt exec_covered by blast
+
+  show ?thesis using assms(3)
+    unfolding ast_problem.execute_plan_action_def
+    unfolding resinst_ground_pa[OF assms(2)] ground_action.sel ga_eff_alt
+    unfolding apply_effect_alt ast_effect.sel
+    using set_image_minus_un(2)[OF injs] by simp
+qed
+
+lemma ground_plan_path_right:
+  assumes "M \<subseteq> set facts" "set \<pi>s \<subseteq> set ops" "plan_action_path M \<pi>s M'"
+  shows "pg.plan_action_path (ground_fmla ` M) (map ground_pa \<pi>s) (ground_fmla ` M')"
+  using assms proof (induction \<pi>s arbitrary: M)
+  case (Cons \<pi> \<pi>s)
+  then obtain M'' where M'': "execute_plan_action \<pi> M = M''" "plan_action_path M'' \<pi>s M'"
+    by simp
+  thus ?case
+    using Cons ground_action_exec_right exec_covered ground_enabled_iff by auto
+qed simp
+
+
+lemma valid_plan_right:
+  assumes "valid_plan \<pi>s"
+  shows "pg.valid_plan (map ground_pa \<pi>s)"
+proof -
+  from assms obtain M where M: "plan_action_path I \<pi>s M" "M \<^sup>c\<TTurnstile>\<^sub>= goal P"
+    unfolding valid_plan_def valid_plan_from_def by blast
+
+  thus ?thesis
+    unfolding ast_problem.valid_plan_def ast_problem.valid_plan_from_def ground_prob_sel
+    using ground_init ground_plan_path_right i_covered path_covered ground_goal_sem
+     by metis
+qed
+
+end
 
 subsection \<open> Code Setup \<close>
 
