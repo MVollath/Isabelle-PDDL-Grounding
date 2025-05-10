@@ -1,6 +1,6 @@
 theory Grounding_Pipeline
   imports Type_Normalization Goal_Normalization Precondition_Normalization
-    PDDL_Relaxation
+    PDDL_Relaxation Grounded_PDDL
 begin
 
 subsection \<open> Setting up compact notations \<close>
@@ -68,6 +68,14 @@ lemma relax_applicables_compact:
   using normed_prob_rx.relax_applicables
   unfolding normed_prob_rx_def normed_prob_def wf_ast_problem_def normed_prob_axioms_def
   by blast
+
+(* lemma needed:
+  wf_problem P \<Longrightarrow> wf_grounder P (relax_reached ops) (relax_reached facts)*)
+
+thm grounder.ground_prob_grounded
+thm wf_grounder.ground_prob_wf
+thm wf_grounder.valid_plan_iff
+thm wf_grounder.valid_plan_left
 
 end
 

@@ -101,6 +101,13 @@ qed
 definition (in ast_problem) achievable :: "object atom formula \<Rightarrow> bool"
   where "achievable a \<equiv> \<exists>\<pi>s M. plan_action_path I \<pi>s M \<and> a \<in> M"
 
+lemma (in wf_ast_problem) init_achievable:
+  "\<forall>a \<in> set (init P). achievable a"
+proof -
+  have "plan_action_path I [] I" by simp
+  thus ?thesis unfolding achievable_def I_def by blast
+qed
+
 lemma (in wf_ast_problem) achievable_predAtm:
   "achievable a \<Longrightarrow> is_predAtom a"
   unfolding achievable_def

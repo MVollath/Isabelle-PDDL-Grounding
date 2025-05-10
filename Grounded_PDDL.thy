@@ -10,13 +10,6 @@ type_synonym facty = "object atom formula" (* maybe fact_atom? *)
 
 (* parameters for grounding: lists of achievable facts and applicable plan actions *)
 
-(*fun fact_to_atom :: "fact \<Rightarrow> object atom formula" where
-  "fact_to_atom (p, args) = Atom (predAtm p args)"
-
-fun atom_to_fact :: "object atom formula \<Rightarrow> fact" where
-  "atom_to_fact (Atom (predAtm p args)) = (p, args)" |
-  "atom_to_fact \<phi> = undefined"*)
-
 fun arg_str :: "object list \<Rightarrow> string" where
   "arg_str [] = ''''" |
   "arg_str [Obj n] = n" |
@@ -45,6 +38,9 @@ fun ground_pred :: "facty \<Rightarrow> nat \<Rightarrow> predicate" where
 abbreviation "fact_names \<equiv> map2 ground_pred facts fact_ids"
 definition "fact_map \<equiv> map_of (zip facts fact_names)"
 
+(* As this signature reveals, this function has to be handled with care,
+  since a new type parameter appears from nowhere.
+  In code, 'a is always object. In proofs, however, it is sometimes term, too. *)
 fun ground_fmla :: "object atom formula \<Rightarrow> 'a atom formula" where
   (* literals *)
   "ground_fmla \<bottom> = \<bottom>" |
@@ -57,9 +53,6 @@ fun ground_fmla :: "object atom formula \<Rightarrow> 'a atom formula" where
   (* covering formulas that don't satisfy \<open>is_conj\<close> *)
   "ground_fmla (\<phi> \<^bold>\<or> \<psi>) = ground_fmla \<phi> \<^bold>\<or> ground_fmla \<psi>" |
   "ground_fmla (\<phi> \<^bold>\<rightarrow> \<psi>) = ground_fmla \<phi> \<^bold>\<rightarrow> ground_fmla \<psi>"
-
-(* fun grounded_pred_decl :: "facty \<Rightarrow> nat \<Rightarrow> predicate_decl" where
-  "grounded_pred_decl f i = PredDecl (grounded_pred f i) []" *)
 
 (* in code, 'a=term. In proofs, 'a can be object, too *)
 fun ga_pre :: "ground_action \<Rightarrow> 'a atom formula" where
@@ -146,18 +139,14 @@ subsection \<open> Alternative definitions \<close>
 
 context grounder begin
 
-find_theorems "(?x = predAtm ?a ?b \<Longrightarrow> ?P)"
-
 lemma ground_pred_cond:
   "is_predAtom a \<Longrightarrow>
   (\<exists>s. ground_pred a i = Pred (padl fact_prefix_pad (show i) @ s))"
   by (cases a rule: is_predAtom.cases) simp_all
 
-(* TODO: this is useless as is. Split it into variants for object and term *)
 lemma ga_pre_alt: "ga_pre ga = ground_fmla (precondition ga)"
   by (cases ga; simp)
 
-(* same. *)
 lemma ga_eff_alt: "ga_eff ga =
   Effect (map ground_fmla (adds (effect ga))) (map ground_fmla (dels (effect ga)))"
   by (cases ga rule: ga_eff.cases) simp
@@ -409,14 +398,6 @@ lemma "length xs = length ys \<Longrightarrow> distinct xs \<Longrightarrow> i <
 lemma "distinct xs \<Longrightarrow> i \<noteq> j \<Longrightarrow> i < length xs \<Longrightarrow> j < length xs \<Longrightarrow> xs ! i \<noteq> xs ! j"
   by (simp add: nth_eq_iff_index_eq)
 
-(* TODO: move to normalization defs *)
-lemma (in wf_ast_problem) init_achievable:
-  "\<forall>a \<in> set (init P). achievable a"
-proof -
-  have "plan_action_path I [] I" by simp
-  thus ?thesis unfolding achievable_def I_def by blast
-qed
-
 lemma gr_init_dis: "distinct (init P\<^sub>G)"
 proof -
   have 0: "init P\<^sub>G = map ground_fmla (init P)" by simp
@@ -458,7 +439,6 @@ theorem ground_prob_wf: "pg.wf_problem"
    using gr_init_wf apply blast
   using gr_goal_wf by blast
 
-
 end
 
 sublocale wf_grounder \<subseteq> dg: wf_ast_domain D\<^sub>G
@@ -493,17 +473,25 @@ sublocale wf_grounder \<subseteq> pg: wf_grounded_problem ground_prob
 
 subsection \<open> Properties of grounded tasks \<close>
 
-lemma (in wf_grounded_problem)
-  assumes "wf_plan_action (PAction n args)"
-  shows "args = []"
+lemma (in wf_grounded_problem) grounded_pa_nullary:
+  "wf_plan_action (PAction n args) \<longleftrightarrow> n \<in> ac_name ` set (actions D) \<and> args = []" (is "?L \<longleftrightarrow> ?R")
 proof -
-  from assms obtain ac where "ac \<in> set (actions D)" "action_params_match ac args"
-    using wf_pa_refs_ac by metis
-  moreover hence "ac_params ac = []" using grounded_dom
-    by (metis ast_action_schema.collapse grounded_ac.simps grounded_dom_def)
-  ultimately show ?thesis using action_params_match_def by simp
+  have empty: "ac_params ac = []" if "ac \<in> set (actions D)" for ac
+    using that grounded_dom grounded_dom_def grounded_ac.simps
+    by (metis ast_action_schema.exhaust_sel that)
+  show ?thesis proof
+    assume ?L
+    then obtain ac where ac: "ac \<in> set (actions D)" "action_params_match ac args" "ac_name ac = n"
+      using wf_pa_refs_ac by metis
+    with ac show ?R using empty action_params_match_def by auto
+  next
+    assume ?R
+    then obtain ac where ac: "ac \<in> set (actions D)" "ac_name ac = n" by blast
+    with \<open>?R\<close> show ?L
+      unfolding wf_plan_action_simple action_params_match_def
+      using res_aux[of n ac] empty by simp
+  qed
 qed
-
 
 subsection \<open> Grounder Semantics \<close>
 
@@ -662,7 +650,7 @@ lemma resinst_ground_pa:
   using assms resolve_ground_pa gr_pa_instantiation ground_pa_def
   by (metis option.sel plan_action.sel)
 
-lemma ground_enabled_iff:
+theorem ground_enabled_iff:
   assumes "M \<subseteq> set facts" "\<pi> \<in> set ops"
   shows "plan_action_enabled \<pi> M \<longleftrightarrow> pg.plan_action_enabled (ground_pa \<pi>) (ground_fmla ` M)"
     (is "?L \<longleftrightarrow> ?R")
@@ -700,14 +688,6 @@ proof -
     from C1 C2 show ?L unfolding plan_action_enabled_def ..
   qed
 qed
-
-(* TODO: Utils, better name *)
-(* TODO check where this was needed in normalization *)
-lemma (in -) set_image_minus_un:
-  assumes "inj_on f (A \<union> B \<union> C \<union> D)"
-  shows "A - B \<union> C = D \<longleftrightarrow> f ` (A - B \<union> C) = f ` D"
-    "A - B \<union> C = D \<longleftrightarrow> f ` A - f ` B \<union> f ` C = f ` D"
-  using assms unfolding inj_on_def by blast+
 
 lemma effs_covered_alt:
   assumes "\<pi> \<in> set ops"
@@ -750,24 +730,8 @@ lemma path_covered:
   using assms all_facts achievable_def apply auto[1]
   using assms all_ops applicable_def by blast
 
-(* TODO split into \<Longrightarrow> and <==, where left side uses restore_pa *)
-lemma ground_action_exec_iff:
-  assumes "M \<subseteq> set facts" "\<pi> \<in> set ops" "M' \<subseteq> set facts" (* assms(3) only needed for <== *)
-  shows "execute_plan_action \<pi> M = M' \<longleftrightarrow>
-    pg.execute_plan_action (ground_pa \<pi>) (ground_fmla ` M) = ground_fmla ` M'"
-proof -
-  have injs: "inj_on ground_fmla (M \<union> set (dels (effect (resolve_instantiate \<pi>)))
-      \<union> set (adds (effect (resolve_instantiate \<pi>))) \<union> M')"
-    apply (rule inj_on_subset[of ground_fmla "set facts"])
-     apply (simp add: ground_fmla_inj)
-    using assms effs_covered_alt by fast
-
-  show ?thesis
-    unfolding ast_problem.execute_plan_action_def
-    unfolding resinst_ground_pa[OF assms(2)] ground_action.sel ga_eff_alt
-    unfolding apply_effect_alt ast_effect.sel
-    using set_image_minus_un(2)[OF injs] by simp
-qed
+(* Right direction; from a valid plan in the lifted instance construct the corresponding plan for
+  the grounded task. *)
 
 lemma ground_action_exec_right:
   assumes "M \<subseteq> set facts" "\<pi> \<in> set ops" "execute_plan_action \<pi> M = M'"
@@ -797,8 +761,7 @@ lemma ground_plan_path_right:
     using Cons ground_action_exec_right exec_covered ground_enabled_iff by auto
 qed simp
 
-
-lemma valid_plan_right:
+theorem valid_plan_right:
   assumes "valid_plan \<pi>s"
   shows "pg.valid_plan (map ground_pa \<pi>s)"
 proof -
@@ -810,6 +773,84 @@ proof -
     using ground_init ground_plan_path_right i_covered path_covered ground_goal_sem
      by metis
 qed
+
+(* Left *)
+
+lemma restore_wf_pa:
+  assumes "pg.wf_plan_action \<pi>'"
+  shows "restore_ground_pa \<pi>' \<in> set ops" "ground_pa (restore_ground_pa \<pi>') = \<pi>'"
+proof -
+  obtain n where pi'[simp]: "\<pi>' = PAction n []"
+    using pg.grounded_pa_nullary assms by (cases \<pi>') simp
+  with assms obtain ac' where ac': "ac' \<in> set (actions D\<^sub>G)" "ac_name ac' = n"
+    using pg.wf_plan_action_simple pg.wf_pa_refs_ac ground_prob_sel
+    by metis
+  then obtain \<pi> where pi: "(\<pi>, n) \<in> set (zip ops op_names)" "\<pi> \<in> set ops" "n \<in> set op_names" "ac' = ground_ac \<pi> n"
+    unfolding ground_dom_sel using map2_obtain ac' ground_ac_sel by metis
+  hence res: "restore_ground_pa \<pi>' = \<pi>"
+    unfolding op_map_def pi' restore_ground_pa.simps
+    using ops_len in_set_zip_flip op_names_dis by fastforce
+  moreover from pi have "ground_pa \<pi> = \<pi>'"
+    unfolding ground_pa_def op_map_inv_def pi'
+    using ops_len ops_dist by simp
+  from res this pi show "restore_ground_pa \<pi>' \<in> set ops" "ground_pa (restore_ground_pa \<pi>') = \<pi>'"
+    by simp_all
+qed
+
+lemma ground_enabled_left:
+  assumes "M \<subseteq> set facts" "pg.plan_action_enabled \<pi>' (ground_fmla ` M)"
+  shows "plan_action_enabled (restore_ground_pa \<pi>') M"
+  using assms restore_wf_pa ground_enabled_iff
+  by (auto simp add: pg.plan_action_enabled_def)
+
+lemma ground_exec_left:
+  assumes "M \<subseteq> set facts" "pg.wf_plan_action \<pi>'"
+  obtains M' where
+    "pg.execute_plan_action \<pi>' (ground_fmla ` M) = ground_fmla ` M'"
+    "execute_plan_action (restore_ground_pa \<pi>') M = M'"
+  using assms restore_wf_pa ground_action_exec_right by metis
+
+lemma ground_plan_path_left:
+  assumes "M \<subseteq> set facts"
+    "pg.plan_action_path (ground_fmla ` M) \<pi>s' gM'"
+  shows "\<exists>M'. gM' = ground_fmla ` M' \<and>
+    plan_action_path M (map restore_ground_pa \<pi>s') M'"
+using assms proof (induction \<pi>s' arbitrary: M)
+  case (Cons \<pi>' \<pi>s')
+  hence w: "pg.wf_plan_action \<pi>'" "list_all1 pg.wf_plan_action \<pi>s'"
+    unfolding pg.plan_action_path_def by simp_all
+  from Cons obtain gN where
+    "pg.execute_plan_action \<pi>' (ground_fmla ` M) = gN"
+    "pg.plan_action_path gN \<pi>s' gM'" by simp
+  with Cons w obtain N where N:
+    "pg.execute_plan_action \<pi>' (ground_fmla ` M) = ground_fmla ` N"
+    "execute_plan_action (restore_ground_pa \<pi>') M = N"
+    "pg.plan_action_path (ground_fmla ` N) \<pi>s' gM'"
+    using ground_exec_left by metis
+  hence "N \<subseteq> set facts"
+    using Cons.prems(1) w restore_wf_pa exec_covered by meson
+  hence "\<exists>M'. gM' = ground_fmla ` M' \<and> plan_action_path N (restore_ground_plan \<pi>s') M'"
+    using Cons.IH w(2) N(3) by presburger
+  with Cons.prems N show ?case using ground_enabled_left by simp
+qed simp
+
+theorem valid_plan_left:
+  assumes "pg.valid_plan \<pi>s'"
+  shows "valid_plan (restore_ground_plan \<pi>s')"
+proof -
+  from assms obtain M' where M': "pg.plan_action_path pg.I \<pi>s' (ground_fmla ` M')"
+    "ground_fmla ` M' \<^sup>c\<TTurnstile>\<^sub>= goal P\<^sub>G" "plan_action_path I (map restore_ground_pa \<pi>s') M'"
+    unfolding pg.valid_plan_def pg.valid_plan_from_def
+    using i_covered ground_plan_path_left ground_init by metis
+  hence "M' \<subseteq> set facts" using path_covered by blast
+  thus ?thesis
+    unfolding valid_plan_def valid_plan_from_def
+    using M' ground_goal_sem by auto
+qed
+
+corollary valid_plan_iff:
+  "\<exists>\<pi>s. valid_plan \<pi>s \<longleftrightarrow> (\<exists>\<pi>s'. pg.valid_plan \<pi>s')"
+  using valid_plan_right valid_plan_left by blast
 
 end
 
@@ -829,10 +870,8 @@ lemmas pddl_ground_code =
   grounder.ground_dom_def
   grounder.ground_prob_def
   grounder.ground_ac_name.simps
-  grounder.fact_map_def
   grounder.op_map_def
   grounder.restore_ground_pa.simps
 declare pddl_ground_code[code]
-
 
 end

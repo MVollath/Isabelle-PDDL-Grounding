@@ -51,6 +51,10 @@ using assms proof (induction xs arbitrary: n)
   thus ?case by (cases n) simp_all
 qed simp
 
+lemma in_set_zip_flip: "length as = length bs \<Longrightarrow> (a, b) \<in> set (zip as bs) \<longleftrightarrow> (b, a) \<in> set (zip bs as)"
+  unfolding in_set_conv_nth by fastforce+
+
+(* utility function: sublist_until *)
 fun sublist_until :: "'a list \<Rightarrow> 'a \<Rightarrow> 'a list" where
   "sublist_until [] a = []" |
   "sublist_until (x # xs) a =
@@ -111,7 +115,7 @@ qed
 
 lemma map2_obtain:
   assumes "z \<in> set (map2 f xs ys)"
-  obtains x y where "z = f x y" "x \<in> set xs" "y \<in> set ys"
+  obtains x y where "z = f x y" "(x, y) \<in> set (zip xs ys)" "x \<in> set xs" "y \<in> set ys" 
   using assms by (induction xs ys rule: list_induct2') auto
 
 (* TODO, if I end up using it *)
@@ -170,4 +174,16 @@ lemma mapof_distinct_zip_distinct:
   shows "distinct (map (the \<circ> map_of (zip xs ys)) as)"
   using assms mapof_zip_inj(1)
   using distinct_map inj_on_subset by blast
+
+(* misc *)
+(* Set arithmetic lemma, useful for effect application.
+  TODO check where this may be needed elsewhere in normalization.
+  Currently only employed in Grounded_PDDL *)
+lemma (in -) set_image_minus_un:
+  assumes "inj_on f (A \<union> B \<union> C \<union> D)"
+  shows "A - B \<union> C = D \<longleftrightarrow> f ` (A - B \<union> C) = f ` D"
+    "A - B \<union> C = D \<longleftrightarrow> f ` A - f ` B \<union> f ` C = f ` D"
+  using assms unfolding inj_on_def by blast+
+
+
 end
