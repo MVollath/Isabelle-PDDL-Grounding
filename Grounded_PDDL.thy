@@ -860,6 +860,7 @@ lemmas pddl_ground_code =
   grounder.fact_ids_def
   grounder.fact_prefix_pad_def
   grounder.op_ids_def
+  grounder.op_names_def
   grounder.op_prefix_pad_def
   grounder.ground_pred.simps
   grounder.fact_map_def

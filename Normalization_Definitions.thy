@@ -137,7 +137,7 @@ definition (in ast_problem) "grounded_prob \<equiv>
   grounded_dom \<and>
   objects P = []"
 
-
+(* TODO: wf grounded problems can't have Eq atoms *)
 
 
 

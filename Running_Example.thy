@@ -4,6 +4,7 @@ theory Running_Example
     PDDL_Checker_Utils
     Grounding_Pipeline
     Grounded_PDDL
+    PDDL_to_STRIPS
 begin
 
 subsection \<open> Problem Description \<close>
@@ -165,10 +166,10 @@ definition "ops \<equiv> [
   PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']
 ]"
 
-
 value "grounder.ground_prob my_problem facts ops"
 
 value "grounder.restore_ground_pa ops (PAction ''0/drive-c1-A-D'' [])"
+
 
 
 subsection \<open> Execution \<close>
@@ -336,5 +337,82 @@ lemma wf_p5: "ast_problem.wf_problem my_prob_relaxed"
 (* note that a plan is still valid after relaxation *)
 lemma "ast_problem.valid_plan my_prob_relaxed my_plan_3"
   by (intro valid_plan_intro[OF wf_p5]) eval
+
+subsection \<open>Grounding\<close>
+
+value my_prob_split
+
+definition "g_facts \<equiv>  [
+      Atom (predAtm (Pred ''______object'') [Obj ''A'']),
+      Atom (predAtm (Pred ''______City'') [Obj ''A'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''B'']),
+      Atom (predAtm (Pred ''______City'') [Obj ''B'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''C'']),
+      Atom (predAtm (Pred ''______City'') [Obj ''C'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''D'']),
+      Atom (predAtm (Pred ''______City'') [Obj ''D'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''E'']),
+      Atom (predAtm (Pred ''______City'') [Obj ''E'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''F'']),
+      Atom (predAtm (Pred ''______City'') [Obj ''F'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''G'']),
+      Atom (predAtm (Pred ''______City'') [Obj ''G'']),
+      Atom (predAtm (Pred ''______Vehicle'') [Obj ''c1'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''c1'']),
+      Atom (predAtm (Pred ''______Movable'') [Obj ''c1'']),
+      Atom (predAtm (Pred ''______Car'') [Obj ''c1'']),
+      Atom (predAtm (Pred ''______Vehicle'') [Obj ''c2'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''c2'']),
+      Atom (predAtm (Pred ''______Movable'') [Obj ''c2'']),
+      Atom (predAtm (Pred ''______Car'') [Obj ''c2'']),
+      Atom (predAtm (Pred ''______Vehicle'') [Obj ''c3'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''c3'']),
+      Atom (predAtm (Pred ''______Movable'') [Obj ''c3'']),
+      Atom (predAtm (Pred ''______Car'') [Obj ''c3'']),
+      Atom (predAtm (Pred ''______Vehicle'') [Obj ''t'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''t'']),
+      Atom (predAtm (Pred ''______Movable'') [Obj ''t'']),
+      Atom (predAtm (Pred ''______Train'') [Obj ''t'']),
+      Atom (predAtm (Pred ''______Movable'') [Obj ''p1'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''p1'']),
+      Atom (predAtm (Pred ''______Parcel'') [Obj ''p1'']),
+      Atom (predAtm (Pred ''______Movable'') [Obj ''p2'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''p2'']),
+      Atom (predAtm (Pred ''______Parcel'') [Obj ''p2'']),
+      Atom (predAtm (Pred ''______Train'') [Obj ''batmobile'']),
+      Atom (predAtm (Pred ''______Car'') [Obj ''batmobile'']),
+      Atom (predAtm (Pred ''______Movable'') [Obj ''batmobile'']),
+      Atom (predAtm (Pred ''______object'') [Obj ''batmobile'']),
+      Atom (predAtm (Pred ''______Vehicle'') [Obj ''batmobile'']),
+      Atom (predAtm (Pred ''______Batmobile'') [Obj ''batmobile'']),
+      Atom (predAtm (Pred ''at'') [Obj ''c1'', Obj ''A'']),
+      Atom (predAtm (Pred ''at'') [Obj ''c2'', Obj ''B'']),
+      Atom (predAtm (Pred ''at'') [Obj ''c3'', Obj ''G'']),
+      Atom (predAtm (Pred ''at'') [Obj ''t'', Obj ''E'']),
+      Atom (predAtm (Pred ''at'') [Obj ''p1'', Obj ''C'']),
+      Atom (predAtm (Pred ''at'') [Obj ''p2'', Obj ''F'']),
+      Atom (predAtm (Pred ''at'') [Obj ''batmobile'', Obj ''D'']),
+      Atom (predAtm (Pred ''road'') [Obj ''A'', Obj ''D'']),
+      Atom (predAtm (Pred ''road'') [Obj ''B'', Obj ''D'']),
+      Atom (predAtm (Pred ''road'') [Obj ''C'', Obj ''D'']),
+      Atom (predAtm (Pred ''rails'') [Obj ''D'', Obj ''E'']),
+      Atom (predAtm (Pred ''road'') [Obj ''E'', Obj ''F'']),
+      Atom (predAtm (Pred ''road'') [Obj ''F'', Obj ''G'']),
+      Atom (predAtm (Pred ''road'') [Obj ''G'', Obj ''E'']),
+      Atom (predAtm (Pred ''Goal____________'') []),
+      Atom (predAtm (Pred ''road'') [Obj ''D'', Obj ''A'']),
+      Atom (predAtm (Pred ''at'') [Obj ''c1'', Obj ''D''])]"
+
+definition "g_ops \<equiv> [
+  PAction ''0drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']
+]"
+
+definition "P\<^sub>G \<equiv> grounder.ground_prob my_prob_split g_facts g_ops"
+value "P\<^sub>G"
+
+definition "P\<^sub>S \<equiv> ast_problem.as_strips P\<^sub>G"
+value "P\<^sub>S"
+value "map (\<lambda>x. (x, initial_of P\<^sub>S x)) (variables_of P\<^sub>S)"
+value "map (\<lambda>x. (x, goal_of P\<^sub>S x)) (variables_of P\<^sub>S)"
 
 end
