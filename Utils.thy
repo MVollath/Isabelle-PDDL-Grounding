@@ -185,5 +185,12 @@ lemma (in -) set_image_minus_un:
     "A - B \<union> C = D \<longleftrightarrow> f ` A - f ` B \<union> f ` C = f ` D"
   using assms unfolding inj_on_def by blast+
 
+(* find_index *)
+
+fun find_index :: "'a \<Rightarrow> 'a list \<rightharpoonup> nat" where
+  "find_index a [] = None" |
+  "find_index a (x # xs) = (if a = x then Some 0
+      else map_option Suc (find_index a xs))"
+
 
 end

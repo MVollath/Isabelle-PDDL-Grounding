@@ -80,6 +80,8 @@ fun as_strips_op :: "ast_action_schema \<Rightarrow> name strips_operator" where
 
 context ast_problem begin
 
+abbreviation "strips_ops \<equiv> map as_strips_op (actions D)"
+
 definition "pos_vars = v\<^sub>T # map pred_vpos (predicates D)"
 definition "neg_vars = v\<^sub>F # map pred_vneg (predicates D)"
 abbreviation "strips_vars \<equiv> pos_vars @ neg_vars"
@@ -107,11 +109,12 @@ definition strips_goal :: "name strips_state" where
 definition as_strips :: "name strips_problem" where
   "as_strips \<equiv> \<lparr> 
     variables_of = strips_vars
-    , operators_of = map as_strips_op (actions D)
+    , operators_of = strips_ops
     , initial_of = strips_init
     , goal_of = strips_goal \<rparr>"
 
-definition "restore_pddl_pa op_i \<equiv> PAction (ac_name (actions D ! op_i)) []"
+definition "restore_pddl_pa op \<equiv>
+  PAction (ac_name (actions D ! the (find_index op strips_ops))) []"
 definition "restore_pddl_plan op_is \<equiv> map restore_pddl_pa op_is"
 
 end text \<open>context ast_problem\<close>
@@ -302,26 +305,21 @@ end text \<open>context ast_problem \<close>
 lemma (in wf_normed_grounded_problem) wf_as_strips_op:
   assumes "ac \<in> set (actions D)"
   shows "is_valid_operator_strips as_strips (as_strips_op ac)"
-    unfolding is_valid_operator_strips_def Let_def
-    unfolding ListMem_iff Ball_set[symmetric]
-    unfolding as_strips_sel
-      apply (intro conjI)
 proof -
-  show "\<forall>v\<in>set (precondition_of (as_strips_op ac)). v \<in> set strips_vars"
+  have C1: "\<forall>v\<in>set (precondition_of (as_strips_op ac)). v \<in> set strips_vars"
     using assms wf_pre_lits wf_lits_covered
     unfolding as_strips_op_sel by blast
 
   obtain a d where eff: "ac_eff ac = Effect a d" by (cases "ac_eff ac") simp
 
-  have 0: "\<forall>v \<in> atm_as_vpos ` set a. v \<in> set strips_vars"
+  have "\<forall>v \<in> atm_as_vpos ` set a. v \<in> set strips_vars"
           "\<forall>v \<in> atm_as_vneg ` set a. v \<in> set strips_vars"
           "\<forall>v \<in> atm_as_vpos ` set d. v \<in> set strips_vars"
           "\<forall>v \<in> atm_as_vneg ` set d. v \<in> set strips_vars"
     using assms eff wf_eff_lits wf_lit_atom_covered by fastforce+
 
-  from 0 show "\<forall>v\<in>set (add_effects_of (as_strips_op ac)). v \<in> set strips_vars"
-    unfolding eff as_strips_op_sel by auto
-  from 0 show "\<forall>v\<in>set (delete_effects_of (as_strips_op ac)). v \<in> set strips_vars"
+  hence C2_3: "\<forall>v\<in>set (add_effects_of (as_strips_op ac)). v \<in> set strips_vars"
+                    "\<forall>v\<in>set (delete_effects_of (as_strips_op ac)). v \<in> set strips_vars"
     unfolding eff as_strips_op_sel by auto
 
   let ?adds = "adds (fix_effect (ac_eff ac))"
@@ -337,8 +335,7 @@ proof -
     apply (cases x rule: wf_lit.cases; cases y rule: wf_lit.cases; simp)
     subgoal for u v apply (cases u; cases v) by simp done
 
-  
-  have 1: "atm_as_vpos ` set ?adds \<inter> atm_as_vpos ` set ?dels = {}" (is ?A)
+  have adds_vs_dels: "atm_as_vpos ` set ?adds \<inter> atm_as_vpos ` set ?dels = {}" (is ?A)
           "atm_as_vneg ` set ?adds \<inter> atm_as_vneg ` set ?dels = {}" (is ?B)
   proof -
     have "set ?adds \<inter> set ?dels = {}"
@@ -349,7 +346,7 @@ proof -
       using lits v_inj neq by metis+
     thus ?A ?B by blast+
   qed
-  have 2: "atm_as_vpos ` set ?adds \<inter> atm_as_vneg ` set ?adds = {}" (is ?A)
+  have pos_vs_neg: "atm_as_vpos ` set ?adds \<inter> atm_as_vneg ` set ?adds = {}" (is ?A)
           "atm_as_vpos ` set ?dels \<inter> atm_as_vneg ` set ?dels = {}" (is ?B)
   proof -
     {
@@ -361,13 +358,15 @@ proof -
     thus ?A ?B by force+
   qed
 
-  show "\<forall>v\<in>set (add_effects_of (as_strips_op ac)). v \<notin> set (delete_effects_of (as_strips_op ac))"
-    apply simp
-    using 1 2 by (metis Set.set_insert Un_iff insert_disjoint(1))
+  have C4_5: "\<forall>v\<in>set (add_effects_of (as_strips_op ac)). v \<notin> set (delete_effects_of (as_strips_op ac))"
+             "\<forall>v\<in>set (delete_effects_of (as_strips_op ac)). v \<notin> set (add_effects_of (as_strips_op ac))"
+    apply simp_all
+    using adds_vs_dels pos_vs_neg by (metis Set.set_insert Un_iff insert_disjoint(1))+
 
-  show "\<forall>v\<in>set (delete_effects_of (as_strips_op ac)). v \<notin> set (add_effects_of (as_strips_op ac))"
-    apply simp
-    using 1 2 by (metis Set.set_insert Un_iff insert_disjoint(1))
+  from C1 C2_3 C4_5 show ?thesis
+    unfolding is_valid_operator_strips_def Let_def
+    unfolding ListMem_iff Ball_set[symmetric]
+    unfolding as_strips_sel by blast    
 qed
 
 lemma (in wf_grounded_problem) init_covered: "strips_init v \<noteq> None \<longleftrightarrow> v \<in> set strips_vars"
@@ -409,7 +408,15 @@ sublocale wf_normed_grounded_problem \<subseteq> s: valid_strips as_strips
 
 subsection \<open> STRIPS task semantics are preserved \<close>
 
-(* TODO *)
+
+theorem (in wf_normed_grounded_problem) restore_pddl_plan:
+  assumes "is_serial_solution_for_problem as_strips \<pi>s"
+  shows "valid_plan (restore_pddl_plan \<pi>s)"
+  oops
+
+theorem (in wf_normed_grounded_problem) valid_plan_iff:
+  "(\<exists>\<pi>s. valid_plan \<pi>s) \<longleftrightarrow> (\<exists>\<pi>s'. is_serial_solution_for_problem as_strips \<pi>s')"
+  oops
 
 
 end
