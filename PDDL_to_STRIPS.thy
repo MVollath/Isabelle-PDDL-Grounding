@@ -115,7 +115,7 @@ definition as_strips :: "name strips_problem" where
 definition "restore_pddl_pa op_i \<equiv> PAction (ac_name (actions D ! op_i)) []"
 definition "restore_pddl_plan op_is \<equiv> map restore_pddl_pa op_is"
 
-end
+end text \<open>context ast_problem\<close>
 
 lemmas to_strips_code =
   ast_problem.vars_defs
@@ -132,7 +132,7 @@ subsection \<open> Alternative definitions \<close>
 
 context ast_problem begin
 
-lemma as_strips_op_sel:
+lemma as_strips_op_sel [simp]:
   fixes ac
   defines "eff' \<equiv> fix_effect (ac_eff ac)"
   shows "precondition_of (as_strips_op ac) = fmla_as_vars (ac_pre ac)"
@@ -142,15 +142,15 @@ lemma as_strips_op_sel:
   apply (cases ac) apply simp_all unfolding as_strips_op.simps Let_def eff'_def apply simp
   apply (cases ac) apply simp_all unfolding as_strips_op.simps Let_def eff'_def by simp
 
-lemma as_strips_sel:
+lemma as_strips_sel [simp]:
   "as_strips \<^sub>\<V> = strips_vars"
   "as_strips \<^sub>\<O> = map as_strips_op (actions D)"
   "as_strips \<^sub>I = strips_init"
   "as_strips \<^sub>G = strips_goal"
   unfolding as_strips_def by simp_all
-end
+end text \<open>context ast_problem\<close>
 
-subsection \<open> Formula proofs \<close>
+subsection \<open> Formula structures \<close>
 
 (* TODO Utils *)
 lemma as_clause_sem: "A \<Turnstile> F \<longleftrightarrow> (\<forall>a \<in> set (as_clause F). A \<Turnstile> a)"
@@ -158,283 +158,256 @@ lemma as_clause_sem: "A \<Turnstile> F \<longleftrightarrow> (\<forall>a \<in> s
 (* ? *)
 lemma as_clause_lits: assumes "is_conj F" shows "list_all1 is_lit_plus (as_clause F)"
   using assms by (induction F rule: is_conj.induct) simp_all
-
-(* as_clause structure *)
-abbreviation (input) "no_eqs F \<equiv> \<forall>a b. Eq a b \<notin> atoms F"
-fun is_predatm_lit where
-  "is_predatm_lit \<bottom> = True" |
-  "is_predatm_lit (\<^bold>\<not>\<bottom>) = True" |
-  "is_predatm_lit (Atom (predAtm n args)) = True" |
-  "is_predatm_lit (\<^bold>\<not>(Atom (predAtm n args))) = True" |
-  "is_predatm_lit _ = False"
+fun (in ast_domain) wf_lit where
+  "wf_lit \<bottom> = True" |
+  "wf_lit (\<^bold>\<not>\<bottom>) = True" |
+  "wf_lit (Atom (predAtm n [])) = (PredDecl n [] \<in> set (predicates D))" |
+  "wf_lit (\<^bold>\<not>(Atom (predAtm n []))) = (PredDecl n [] \<in> set (predicates D))" |
+  "wf_lit _ = False"
+abbreviation (in ast_domain) "wf_lit_atom F \<equiv> wf_lit F \<and> is_predAtom F"
 (* ? *)
-lemma is_predatm_lit_plus: "is_predatm_lit F \<Longrightarrow> is_lit_plus F"
-  by (cases F rule: is_predatm_lit.cases) simp_all
-lemma no_eqs_as_clause:
-  assumes "is_conj F \<and> no_eqs F"
-  shows "list_all1 is_predatm_lit (as_clause F)"
-using assms proof (induction F rule: as_clause.induct)
-  case (1 A B)
-  thus ?case by (cases A rule: is_predatm_lit.cases) force+
-next
-  case ("2_1" a)
-  thus ?case by (cases a) simp_all
-next
-  case ("2_3" a)
-  thus ?case by (cases a rule: is_predAtom.cases) simp_all
-qed simp_all
+lemma (in ast_domain) wf_lit_plus: "wf_lit L \<Longrightarrow> is_lit_plus L"
+  by (cases L rule: wf_lit.cases) simp_all
 
-(* grounded no eq *)
+(* technically, also holds in ast_domain but easier to prove here with sig_Some *)
+context wf_ast_domain begin
+lemma wf_predatom_lit:
+  "wf_pred_atom (\<lambda>x. None) (n, args) \<longleftrightarrow> args = [] \<and> PredDecl n [] \<in> set (predicates D)"
+  (is "?L \<longleftrightarrow> ?R")
+proof -
+  have notypes: "list_all2 (is_of_type (\<lambda>x. None)) vs Ts \<longleftrightarrow> vs = [] \<and> Ts = []" for vs Ts
+    unfolding is_of_type_def of_type_def by (cases vs; cases Ts) force+
+
+  have "?L \<longleftrightarrow> (\<exists>Ts. sig n = Some Ts \<and> list_all2 (is_of_type (\<lambda>x. None)) args Ts)"
+    unfolding wf_pred_atom.simps using case_optionE by fastforce
+  also have "... \<longleftrightarrow> (sig n = Some [] \<and> args = [])"
+    using notypes by metis
+  also have "... \<longleftrightarrow> ?R"
+    using sig_Some by blast
+  finally show ?thesis .
+qed
+
+lemma wf_empty_lit:
+  assumes "is_lit_plus L" "wf_fmla (\<lambda>x. None) L"
+  shows "wf_lit L"
+  using assms wf_predatom_lit[unfolded wf_pred_atom.simps]
+  by (cases L rule: wf_lit.cases) force+
+
+lemma wf_empty_lits:
+  assumes "is_conj F" "wf_fmla (\<lambda>x. None) F"
+  shows "list_all1 wf_lit (as_clause F)"
+  using assms wf_empty_lit
+  by (induction F rule: as_clause.induct) auto
+
+lemma wf_empty_atom:
+  assumes "wf_fmla_atom (\<lambda>x. None) L"
+  shows "wf_lit L"
+proof -
+  from assms have "is_lit_plus L" unfolding wf_fmla_atom_alt
+    by (cases L rule: is_predAtom.cases) simp_all
+  with assms show ?thesis using wf_empty_lit unfolding wf_fmla_atom_alt by blast
+qed
+end text \<open>context wf_ast_domain\<close>
+
 
 context wf_grounded_problem begin
 
+lemma constT_empty: "constT = (\<lambda>x. None)"
+  using grounded_dom
+  unfolding grounded_dom_def constT_def by auto
 lemma objT_empty: "objT = (\<lambda>x. None)"
-  using grounded_prob grounded_dom
-  unfolding grounded_prob_def grounded_dom_def objT_def constT_def by auto
+  using grounded_prob constT_empty
+  unfolding grounded_prob_def objT_def by auto
 
-lemma (in wf_ast_domain) wf_empty_atoms:
-  assumes "wf_fmla (\<lambda>x. None) F"
-  shows 
-    "\<forall>a \<in> atoms F. \<exists>n. a = predAtm n [] \<and> PredDecl n [] \<in> set (predicates D)"
-using assms proof (induction F)
-  case (Atom x)
-  then show ?case proof (cases x)
-    case (predAtm n args)
-    with Atom obtain Ts where 1: "sig n = Some Ts" "list_all2 (is_of_type (\<lambda>x. None)) args Ts"
-      unfolding predAtm wf_fmla.simps wf_atom.simps wf_pred_atom.simps
-      using case_optionE by blast
-    hence 2: "args = [] \<and> Ts = []" unfolding is_of_type_def
-      using list.rel_cases by auto
-    with 1 have "PredDecl n [] \<in> set (predicates D)"
-      using sig_Some by blast
-    with 2 show ?thesis using predAtm by simp
-  qed simp
-qed auto
-
-lemma (in wf_ast_domain) wf_empty_no_eqs:
-  assumes "wf_fmla (\<lambda>x. None) F"
-  shows "Eq a b \<notin> atoms F"
-  using assms wf_empty_atoms by blast
-
-lemma goal_no_eqs: "Eq a b \<notin> atoms (goal P)"
-  using objT_empty wf_P(5) wf_empty_no_eqs by simp
-
-context fixes ac assumes ac_in: "ac \<in> set (actions D)" begin
-
-lemma ac_tyt_empty: "ac_tyt ac = (\<lambda>x. None)"
+(* technically, wf_grounded_problem suffices for this one *)
+lemma ac_tyt_empty:
+  assumes "ac \<in> set (actions D)" shows "ac_tyt ac = (\<lambda>x. None)"
 proof -
-  have 1: "constT = (\<lambda>x. None)" using grounded_dom grounded_dom_def constT_def by simp
-  from ac_in have "grounded_ac ac" using grounded_dom grounded_dom_def by blast
-  hence 2: "ac_params ac = []" by (cases ac) simp
+  from assms have "grounded_ac ac" using grounded_dom grounded_dom_def by blast
+  hence "ac_params ac = []" by (cases ac) simp
   thus "?thesis"
     apply (intro ext)
     subgoal for x
-      using 1 2 by (cases x) simp_all
+      using constT_empty by (cases x) simp_all
     done
 qed
 
-lemma pre_no_eqs: "Eq a b \<notin> atoms (ac_pre ac)"
-  using ac_in ac_tyt_empty
-  using wf_D(7) wf_action_schema_alt wf_empty_no_eqs  by metis
+lemma (in wf_normed_grounded_problem) wf_pre_lits:
+  assumes "ac \<in> set (actions D)" shows "list_all1 wf_lit (as_clause (ac_pre ac))"
+proof -
+  have "wf_fmla (\<lambda>x. None) (ac_pre ac)"
+    using assms wf_D(7) ac_tyt_empty wf_action_schema_alt by metis
+  moreover have "is_conj (ac_pre ac)"
+    using assms normed_prob
+    unfolding prec_normed_dom_def by simp
+  ultimately show ?thesis using wf_empty_lits by blast
+qed
 
-lemma ac_pre_atoms:
-  "\<forall>a \<in> atoms (ac_pre ac). \<exists>n. a = predAtm n [] \<and> PredDecl n [] \<in> set (predicates D)"
-  using ac_in ac_tyt_empty
-  using wf_D(7) wf_action_schema_alt wf_empty_atoms by metis
+lemma wf_eff_lits:
+  assumes "ac \<in> set (actions D)"
+  shows "list_all1 wf_lit_atom (adds (ac_eff ac))" (is ?A)
+        "list_all1 wf_lit_atom (dels (ac_eff ac))" (is ?B)
+  using assms ac_tyt_empty
+  using wf_D(7) wf_action_schema_alt wf_effect_alt wf_empty_atom wf_fmla_atom_alt
+    by metis+
 
-lemma ac_eff_empty:
-  "list_all1 (wf_fmla_atom (\<lambda>x. None)) (adds (ac_eff ac))"
-  "list_all1 (wf_fmla_atom (\<lambda>x. None)) (dels (ac_eff ac))"
-  using ac_in ac_tyt_empty
-  using wf_D(7) wf_action_schema_alt wf_effect_alt by metis+
+lemma wf_init_lits:
+  shows "list_all1 wf_lit_atom (init P)"
+  using wf_empty_atom wf_P(4) wf_fmla_atom_alt
+  unfolding wf_world_model_def objT_empty by blast
 
-end
+end text \<open>context wf_grounded_problem \<close>
 
-(* not needed for init and effs, since it direcly follows with wf_fmla_atom_alt *)
-end
+lemma (in wf_normed_grounded_problem) wf_goal_lits:
+  "list_all1 wf_lit (as_clause (goal P))"
+  using objT_empty wf_P(5) wf_empty_lits normed_prob by auto
 
 subsection \<open> STRIPS task is WF \<close>
 
-context wf_normed_grounded_problem begin
+context ast_problem begin
 
-thm ListMem_iff
+lemma (in ast_problem) wf_lit_covered:
+  assumes "wf_lit F"
+  shows "lit_as_var F \<in> set strips_vars"
+  unfolding vars_defs
+  using assms by (cases F rule: wf_lit.cases) force+
 
-thm wf_fmla_alt
+lemma (in ast_problem) wf_lit_goal_covered:
+  assumes "wf_lit F"
+  shows "fst (lit_as_goal F) \<in> set strips_vars"
+  unfolding vars_defs
+  using assms by (cases F rule: wf_lit.cases) force+
 
-lemma a: "PredDecl n [] \<in> set (predicates D) \<Longrightarrow> vpos n \<in> pred_vpos ` set (predicates D)"
-  by force
-lemma b: "PredDecl n [] \<in> set (predicates D) \<Longrightarrow> vneg n \<in> pred_vneg ` set (predicates D)"
-  by force
-
-
-lemma fmla_vars_covered:
-  assumes "is_conj F" "\<forall>a \<in> atoms F. \<exists>n. a = predAtm n [] \<and> PredDecl n [] \<in> set (predicates D)"
-  shows "set (fmla_as_vars F) \<subseteq> set strips_vars"
-  unfolding fmla_as_vars_def vars_defs
-  using assms apply (induction F rule: as_clause.induct)
-  subgoal for A apply (cases A rule: lit_as_var.cases)
-    apply simp_all
-    using a b by fast+
-  subgoal for v by (cases v) force+
-  apply simp_all
-  subgoal for v by (cases v rule: is_predAtom.cases) force+
+lemma (in ast_problem) wf_lit_atom_covered:
+  assumes "wf_lit_atom F" shows
+    "atm_as_vpos F \<in> set pos_vars"
+    "atm_as_vneg F \<in> set neg_vars"
+  unfolding vars_defs
+  using assms apply (cases F rule: wf_lit.cases) apply force+
+  using assms apply (cases F rule: wf_lit.cases) apply force+
   done
 
-thm wf_empty_atoms
+lemma (in ast_problem) wf_lits_covered:
+  assumes "list_all1 wf_lit (as_clause F)"
+  shows "set (fmla_as_vars F) \<subseteq> set strips_vars"
+  using assms wf_lit_covered unfolding fmla_as_vars_def by auto
 
-lemma wf_empty_fmla_atom:
-  assumes "wf_fmla_atom (\<lambda>x. None) a"
-  shows "\<exists>n. a = Atom (predAtm n []) \<and> PredDecl n [] \<in> set (predicates D)"
-  using assms wf_empty_atoms
-  unfolding wf_fmla_atom_alt
-  apply (cases a rule: is_predAtom.cases) by fastforce+
+lemma (in ast_problem) wf_lits_goal_covered:
+  assumes "list_all1 wf_lit (as_clause F)"
+  shows "fst ` set (fmla_as_goals F) \<subseteq> set strips_vars"
+  using assms wf_lit_goal_covered apply simp
+  using image_iff list.set_map subsetI by blast
 
-lemma wf_empty_atom_covered:
-  assumes "wf_fmla_atom (\<lambda>x. None) a"
-  shows "atm_as_vpos a \<in> set strips_vars" "atm_as_vneg a \<in> set strips_vars"
-  unfolding vars_defs
-  using assms[THEN wf_empty_fmla_atom] apply (cases a rule: is_predAtom.cases) apply force+
-  using assms[THEN wf_empty_fmla_atom] apply (cases a rule: is_predAtom.cases) by force+
+end text \<open>context ast_problem \<close>
 
-find_theorems "set (map ?f ?xs) = ?f ` set ?xs"
-
-abbreviation "empty_atom a \<equiv> \<exists>n. a = Atom (predAtm n []) \<and> PredDecl n [] \<in> set (predicates D)"
-
-lemma wf_as_strips_op:
+lemma (in wf_normed_grounded_problem) wf_as_strips_op:
   assumes "ac \<in> set (actions D)"
   shows "is_valid_operator_strips as_strips (as_strips_op ac)"
-  unfolding is_valid_operator_strips_def Let_def ListMem_iff Ball_set[symmetric]
-  unfolding as_strips_sel
-  apply (intro conjI)
-  unfolding as_strips_op_sel
+    unfolding is_valid_operator_strips_def Let_def
+    unfolding ListMem_iff Ball_set[symmetric]
+    unfolding as_strips_sel
+      apply (intro conjI)
 proof -
-  from assms have "no_eqs (ac_pre ac)" using pre_no_eqs by blast
-  note 1 = ac_pre_atoms[OF assms]
-  from assms have "is_conj (ac_pre ac)"
-    using normed_dom unfolding prec_normed_dom_def by fast
-
-  from fmla_vars_covered[OF this 1] show "\<forall>v\<in>set (fmla_as_vars (ac_pre ac)). v \<in> set strips_vars"
-    by blast
+  show "\<forall>v\<in>set (precondition_of (as_strips_op ac)). v \<in> set strips_vars"
+    using assms wf_pre_lits wf_lits_covered
+    unfolding as_strips_op_sel by blast
 
   obtain a d where eff: "ac_eff ac = Effect a d" by (cases "ac_eff ac") simp
 
-  have 1: "\<forall>v \<in> atm_as_vpos ` set a. v \<in> set strips_vars"
+  have 0: "\<forall>v \<in> atm_as_vpos ` set a. v \<in> set strips_vars"
           "\<forall>v \<in> atm_as_vneg ` set a. v \<in> set strips_vars"
           "\<forall>v \<in> atm_as_vpos ` set d. v \<in> set strips_vars"
           "\<forall>v \<in> atm_as_vneg ` set d. v \<in> set strips_vars"
-    using eff wf_empty_atom_covered ac_eff_empty[OF assms] by auto
+    using assms eff wf_eff_lits wf_lit_atom_covered by fastforce+
 
-  thus "\<forall>v\<in>set (map atm_as_vpos (adds (fix_effect (ac_eff ac))) @
-             map atm_as_vneg (dels (fix_effect (ac_eff ac)))).
-       v \<in> set strips_vars" unfolding eff by auto
-
-  from 1 show "\<forall>v\<in>set (map atm_as_vpos (dels (fix_effect (ac_eff ac))) @
-             map atm_as_vneg (adds (fix_effect (ac_eff ac)))).
-       v \<in> set strips_vars" unfolding eff by auto
+  from 0 show "\<forall>v\<in>set (add_effects_of (as_strips_op ac)). v \<in> set strips_vars"
+    unfolding eff as_strips_op_sel by auto
+  from 0 show "\<forall>v\<in>set (delete_effects_of (as_strips_op ac)). v \<in> set strips_vars"
+    unfolding eff as_strips_op_sel by auto
 
   let ?adds = "adds (fix_effect (ac_eff ac))"
   let ?dels = "dels (fix_effect (ac_eff ac))"
 
-  note ac_eff_empty[OF assms] wf_empty_fmla_atom
-  hence eatms: "list_all1 empty_atom ?adds \<and> list_all1 empty_atom ?dels"
-    by (cases "ac_eff ac") auto
-  have v_inj: "x \<noteq> y \<Longrightarrow> empty_atom x \<Longrightarrow> empty_atom y \<Longrightarrow>
+  have lits: "\<forall>x\<in>set ?adds. wf_lit_atom x"
+    "\<forall>x\<in>set ?dels. wf_lit_atom x"
+    using wf_eff_lits[OF assms] apply (cases "ac_eff ac") apply simp_all
+    using wf_eff_lits[OF assms] apply (cases "ac_eff ac") apply simp_all
+    done
+  have v_inj: "x \<noteq> y \<Longrightarrow> wf_lit_atom x \<Longrightarrow> wf_lit_atom y \<Longrightarrow>
     atm_as_vpos x \<noteq> atm_as_vpos y \<and> atm_as_vneg x \<noteq> atm_as_vneg y" for x y
-    apply (cases x rule: is_predAtom.cases; cases y rule: is_predAtom.cases; simp)
+    apply (cases x rule: wf_lit.cases; cases y rule: wf_lit.cases; simp)
     subgoal for u v apply (cases u; cases v) by simp done
-  have p_neq_n: "empty_atom x \<Longrightarrow> atm_as_vpos x \<noteq> atm_as_vneg x" for x
-    by (cases x rule: is_predAtom.cases) simp_all
 
-  have 0: "set ?adds \<inter> set ?dels = {}"
-    by (cases "ac_eff ac") auto
-  have 1: "atm_as_vpos ` set ?adds \<inter> atm_as_vpos ` set ?dels = {}"
+  
+  have 1: "atm_as_vpos ` set ?adds \<inter> atm_as_vpos ` set ?dels = {}" (is ?A)
+          "atm_as_vneg ` set ?adds \<inter> atm_as_vneg ` set ?dels = {}" (is ?B)
   proof -
-    have "\<forall>x \<in> set ?adds. \<forall>y \<in> set ?dels. x \<noteq> y" using 0 by blast
-    hence "\<forall>x \<in> set ?adds. \<forall>y \<in> set ?dels. atm_as_vpos x \<noteq> atm_as_vpos y"
-      using eatms v_inj by metis
-    thus ?thesis by blast
+    have "set ?adds \<inter> set ?dels = {}"
+      by (cases "ac_eff ac") auto
+    hence neq: "\<forall>x \<in> set ?adds. \<forall>y \<in> set ?dels. x \<noteq> y" by blast
+    have "\<forall>x \<in> set ?adds. \<forall>y \<in> set ?dels. atm_as_vpos x \<noteq> atm_as_vpos y"
+         "\<forall>x \<in> set ?adds. \<forall>y \<in> set ?dels. atm_as_vneg x \<noteq> atm_as_vneg y"
+      using lits v_inj neq by metis+
+    thus ?A ?B by blast+
   qed
-  have 2: "atm_as_vneg ` set ?adds \<inter> atm_as_vneg ` set ?dels = {}"
-  proof -
-    have "\<forall>x \<in> set ?adds. \<forall>y \<in> set ?dels. x \<noteq> y" using 0 by blast
-    hence "\<forall>x \<in> set ?adds. \<forall>y \<in> set ?dels. atm_as_vneg x \<noteq> atm_as_vneg y"
-      using eatms v_inj by metis
-    thus ?thesis by blast
-  qed
-  have 3:
-    "atm_as_vpos ` set ?adds \<inter> atm_as_vneg ` set ?adds = {}"
+  have 2: "atm_as_vpos ` set ?adds \<inter> atm_as_vneg ` set ?adds = {}" (is ?A)
+          "atm_as_vpos ` set ?dels \<inter> atm_as_vneg ` set ?dels = {}" (is ?B)
   proof -
     {
-      fix x y assume a: "x \<in> set ?adds" "y \<in> set ?adds"
-      hence "empty_atom x" "empty_atom y" by (simp_all add: eatms)
+      fix x y l assume "l = ?adds \<or> l = ?dels" "x \<in> set l" "y \<in> set l"
+      hence "wf_lit_atom x" "wf_lit_atom y" by (auto simp add: lits)
       hence "atm_as_vneg x \<noteq> atm_as_vpos y"
-        using eatms by (cases x rule: is_predAtom.cases; cases y rule: is_predAtom.cases)
-        simp_all
+        by (cases x rule: is_predAtom.cases; cases y rule: is_predAtom.cases) simp_all
     }
-    thus ?thesis by force
-  qed
-  have 4: "atm_as_vpos ` set ?dels \<inter> atm_as_vneg ` set ?dels = {}"
-  proof -
-    {
-      fix x y assume a: "x \<in> set ?dels" "y \<in> set ?dels"
-      hence "empty_atom x" "empty_atom y" by (simp_all add: eatms)
-      hence "atm_as_vneg x \<noteq> atm_as_vpos y"
-        using eatms by (cases x rule: is_predAtom.cases; cases y rule: is_predAtom.cases)
-        simp_all
-    }
-    thus ?thesis by force
+    thus ?A ?B by force+
   qed
 
-  show "\<forall>v\<in>set (map atm_as_vpos (adds (fix_effect (ac_eff ac))) @
-             map atm_as_vneg (dels (fix_effect (ac_eff ac)))).
-       v \<notin> set (map atm_as_vpos (dels (fix_effect (ac_eff ac))) @
-                 map atm_as_vneg (adds (fix_effect (ac_eff ac))))"
+  show "\<forall>v\<in>set (add_effects_of (as_strips_op ac)). v \<notin> set (delete_effects_of (as_strips_op ac))"
     apply simp
-    using 1 2 3 4
-    by (metis Set.set_insert Un_iff insert_disjoint(1))
+    using 1 2 by (metis Set.set_insert Un_iff insert_disjoint(1))
 
-  show "\<forall>v\<in>set (map atm_as_vpos (dels (fix_effect (ac_eff ac))) @
-             map atm_as_vneg (adds (fix_effect (ac_eff ac)))).
-       v \<notin> set (map atm_as_vpos (adds (fix_effect (ac_eff ac))) @
-                 map atm_as_vneg (dels (fix_effect (ac_eff ac))))"
+  show "\<forall>v\<in>set (delete_effects_of (as_strips_op ac)). v \<notin> set (add_effects_of (as_strips_op ac))"
     apply simp
-    using 1 2 3 4
-    by (metis Set.set_insert Un_iff insert_disjoint(1))
+    using 1 2 by (metis Set.set_insert Un_iff insert_disjoint(1))
 qed
 
-theorem init_covered: "strips_init v \<noteq> None \<longleftrightarrow> v \<in> set strips_vars"
+lemma (in wf_grounded_problem) init_covered: "strips_init v \<noteq> None \<longleftrightarrow> v \<in> set strips_vars"
 proof -
-  have i: "fold (\<lambda>v s. s(v \<mapsto> b)) vars s v \<noteq> None \<longleftrightarrow> v \<in> set vars \<or> s v \<noteq> None"
+  have "fold (\<lambda>v s. s(v \<mapsto> b)) vars s v \<noteq> None \<longleftrightarrow> v \<in> set vars \<or> s v \<noteq> None"
     for b vars s by (induction vars arbitrary: s) simp_all
-  from i have "empty_state v \<noteq> None \<longleftrightarrow> v \<in> set neg_vars \<or> v \<in> set pos_vars"
-    unfolding empty_state_def using i by metis
-  hence k: "empty_state v \<noteq> None \<longleftrightarrow> v \<in> set strips_vars" by force
+  hence "empty_state v \<noteq> None \<longleftrightarrow> v \<in> set neg_vars \<or> v \<in> set pos_vars"
+    unfolding empty_state_def by metis
+  hence empty: "empty_state v \<noteq> None \<longleftrightarrow> v \<in> set strips_vars" by force
 
-  have j: "fold upd_init vars s v \<noteq> None \<longleftrightarrow> s v \<noteq> None \<or>
+  have "fold upd_init vars s v \<noteq> None \<longleftrightarrow> s v \<noteq> None \<or>
     (\<exists>x \<in> set vars. atm_as_vpos x = v \<or> atm_as_vneg x = v)" for vars s
     unfolding upd_init_def by (induction vars arbitrary: s) auto
   moreover have "\<exists>x \<in> set (init P). atm_as_vpos x = v \<or> atm_as_vneg x = v \<Longrightarrow> v \<in> set strips_vars"
-    using wf_P(4) unfolding wf_world_model_def objT_empty
-    using wf_empty_atom_covered by blast
-  ultimately show ?thesis unfolding strips_init_def using k by blast
+    using wf_init_lits wf_lit_atom_covered by auto
+  ultimately show ?thesis unfolding strips_init_def using empty by blast
 qed
 
-
-
-theorem goal_covered:
+lemma (in wf_normed_grounded_problem) goal_covered:
   assumes "strips_goal v \<noteq> None"
-  shows "ListMem v strips_vars"
-  sorry
+  shows "v \<in> set strips_vars"
+proof -
+  have "fold upd_goal xs s v \<noteq> None \<longleftrightarrow> s v \<noteq> None \<or> v \<in> fst ` set xs"
+    for xs s apply (induction xs arbitrary: s) apply auto done
+  hence "v \<in> fst ` set (fmla_as_goals (goal P))"
+    using assms unfolding strips_goal_def by metis
+  thus ?thesis using wf_goal_lits wf_lits_goal_covered by blast
+qed
 
-theorem wf_as_strips: "is_valid_problem_strips as_strips"
+theorem (in wf_normed_grounded_problem) wf_as_strips: "is_valid_problem_strips as_strips"
   unfolding is_valid_problem_strips_def Let_def as_strips_sel
   apply (intro conjI)
   using wf_as_strips_op unfolding Ball_set[symmetric] apply simp
   using init_covered apply (meson ListMem_iff)
   using goal_covered by (meson ListMem_iff)
 
+subsection \<open> STRIPS task semantics are preserved \<close>
 
+(* TODO *)
 
-end
 
 end
