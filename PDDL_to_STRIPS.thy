@@ -1,8 +1,7 @@
 theory PDDL_to_STRIPS
   imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
     "AI_Planning_Languages_Semantics.Option_Monad_Add"
-    "Verified_SAT_Based_AI_Planning.STRIPS_Semantics"
-    PDDL_Sema_Supplement Normalization_Definitions
+    PDDL_Sema_Supplement STRIPS_Sema_Supplement Normalization_Definitions
     Utils Formula_Utils (* String_Shenanigans *)
     "Propositional_Proof_Systems.CNF"
     (* list linorder: *) "HOL-Library.List_Lexorder" "HOL-Library.Char_ord" (* only used to minimize negative variables *)
@@ -404,6 +403,9 @@ theorem (in wf_normed_grounded_problem) wf_as_strips: "is_valid_problem_strips a
   using wf_as_strips_op unfolding Ball_set[symmetric] apply simp
   using init_covered apply (meson ListMem_iff)
   using goal_covered by (meson ListMem_iff)
+
+sublocale wf_normed_grounded_problem \<subseteq> s: valid_strips as_strips
+  using wf_as_strips by unfold_locales
 
 subsection \<open> STRIPS task semantics are preserved \<close>
 
