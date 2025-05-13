@@ -402,12 +402,36 @@ proof -
     by (metis Set.set_insert Un_iff insert_disjoint(1))
 qed
 
+theorem init_covered: "strips_init v \<noteq> None \<longleftrightarrow> v \<in> set strips_vars"
+proof -
+  have i: "fold (\<lambda>v s. s(v \<mapsto> b)) vars s v \<noteq> None \<longleftrightarrow> v \<in> set vars \<or> s v \<noteq> None"
+    for b vars s by (induction vars arbitrary: s) simp_all
+  from i have "empty_state v \<noteq> None \<longleftrightarrow> v \<in> set neg_vars \<or> v \<in> set pos_vars"
+    unfolding empty_state_def using i by metis
+  hence k: "empty_state v \<noteq> None \<longleftrightarrow> v \<in> set strips_vars" by force
+
+  have j: "fold upd_init vars s v \<noteq> None \<longleftrightarrow> s v \<noteq> None \<or>
+    (\<exists>x \<in> set vars. atm_as_vpos x = v \<or> atm_as_vneg x = v)" for vars s
+    unfolding upd_init_def by (induction vars arbitrary: s) auto
+  moreover have "\<exists>x \<in> set (init P). atm_as_vpos x = v \<or> atm_as_vneg x = v \<Longrightarrow> v \<in> set strips_vars"
+    using wf_P(4) unfolding wf_world_model_def objT_empty
+    using wf_empty_atom_covered by blast
+  ultimately show ?thesis unfolding strips_init_def using k by blast
+qed
+
+
+
+theorem goal_covered:
+  assumes "strips_goal v \<noteq> None"
+  shows "ListMem v strips_vars"
+  sorry
+
 theorem wf_as_strips: "is_valid_problem_strips as_strips"
   unfolding is_valid_problem_strips_def Let_def as_strips_sel
   apply (intro conjI)
   using wf_as_strips_op unfolding Ball_set[symmetric] apply simp
-  oops
-
+  using init_covered apply (meson ListMem_iff)
+  using goal_covered by (meson ListMem_iff)
 
 
 
