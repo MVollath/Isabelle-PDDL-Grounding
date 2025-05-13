@@ -37,7 +37,7 @@ definition (in ast_problem) typeless_prob :: "bool" where
 definition (in ast_domain) "prec_normed_dom \<equiv>
   \<forall>ac \<in> set (actions D). is_conj (ac_pre ac)"
 
-abbreviation (in ast_problem) "prec_normed_prob \<equiv> prec_normed_dom"
+abbreviation (in ast_problem) (input) "prec_normed_prob \<equiv> prec_normed_dom"
 
 definition (in ast_domain) "normalized_dom \<equiv>
   typeless_dom \<and> prec_normed_dom"
@@ -137,9 +137,46 @@ definition (in ast_problem) "grounded_prob \<equiv>
   grounded_dom \<and>
   objects P = []"
 
-(* TODO: wf grounded problems can't have Eq atoms *)
 
+locale wf_grounded_domain = wf_ast_domain +
+  assumes grounded_dom: grounded_dom
 
+locale wf_grounded_problem = wf_ast_problem +
+  assumes grounded_prob: grounded_prob
+
+sublocale wf_grounded_problem \<subseteq> wf_grounded_domain D
+  using grounded_prob grounded_prob_def by (unfold_locales) simp
+
+lemma (in wf_grounded_problem) grounded_pa_nullary:
+  "wf_plan_action (PAction n args) \<longleftrightarrow> n \<in> ac_name ` set (actions D) \<and> args = []" (is "?L \<longleftrightarrow> ?R")
+proof -
+  have empty: "ac_params ac = []" if "ac \<in> set (actions D)" for ac
+    using that grounded_dom grounded_dom_def grounded_ac.simps
+    by (metis ast_action_schema.exhaust_sel that)
+  show ?thesis proof
+    assume ?L
+    then obtain ac where ac: "ac \<in> set (actions D)" "action_params_match ac args" "ac_name ac = n"
+      using wf_pa_refs_ac by metis
+    with ac show ?R using empty action_params_match_def by auto
+  next
+    assume ?R
+    then obtain ac where ac: "ac \<in> set (actions D)" "ac_name ac = n" by blast
+    with \<open>?R\<close> show ?L
+      unfolding wf_plan_action_simple action_params_match_def
+      using res_aux[of n ac] empty by simp
+  qed
+qed
+
+(* grounded, normalized PDDL *)
+
+locale wf_normed_grounded_domain = wf_grounded_domain +
+  assumes normed_dom: prec_normed_dom
+
+locale wf_normed_grounded_problem = wf_grounded_problem +
+  assumes normed_prob: "prec_normed_prob \<and> (is_conj (goal P))"
+
+sublocale wf_normed_grounded_problem \<subseteq> wf_normed_grounded_domain D
+  using normed_prob by (unfold_locales) blast
 
 
 end

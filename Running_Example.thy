@@ -410,6 +410,8 @@ definition "g_ops \<equiv> [
 definition "P\<^sub>G \<equiv> grounder.ground_prob my_prob_split g_facts g_ops"
 value "P\<^sub>G"
 
+(* TO STRIPS *)
+
 definition "P\<^sub>S \<equiv> ast_problem.as_strips P\<^sub>G"
 value "P\<^sub>S"
 value "map (\<lambda>x. (x, initial_of P\<^sub>S x)) (variables_of P\<^sub>S)"
