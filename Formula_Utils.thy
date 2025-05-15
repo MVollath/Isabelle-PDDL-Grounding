@@ -1,6 +1,7 @@
 theory Formula_Utils
   imports "Propositional_Proof_Systems.Sema"
     "Propositional_Proof_Systems.CNF_Formulas"
+    "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics" (* just for the datatype atom *)
 begin
 
 subsection \<open> pure conjunctions \<close>
@@ -11,7 +12,6 @@ fun is_conj where
   "is_conj (F \<^bold>\<and> G) \<longleftrightarrow> is_lit_plus F \<and> is_conj G" |
   "is_conj H \<longleftrightarrow> is_lit_plus H"
 
-
 (* assumes the argument to be in a right-deep tree, i.e. is_conj *)
 (* possible optimization: un_and (Not Bot) = []" *)
 (* still is defined and preserves semantics if argument isn't a pure right conjunction *)
@@ -19,104 +19,30 @@ fun un_and :: "'a formula \<Rightarrow> 'a formula list" where
   "un_and (F \<^bold>\<and> G) = F # un_and G" |
   "un_and F = [F]"
 
-lemma "is_conj F \<Longrightarrow> \<forall>f \<in> set (un_and F). is_lit_plus f"
-  by (induction F rule: is_conj.induct) simp_all
+lemma conj_induct [consumes 1,
+    case_names Bot Top Atom NotAtom BotAnd TopAnd AtomAnd NotAtomAnd]:
+  assumes "is_conj \<phi>"
+    "P \<bottom>" "P (\<^bold>\<not>\<bottom>)" "\<And>a. P(Atom a)" "\<And>a. P(\<^bold>\<not> (Atom a))"
+    "\<And>G. P G \<Longrightarrow> P (\<bottom> \<^bold>\<and> G)" "\<And>G. P G \<Longrightarrow> P (\<^bold>\<not>\<bottom> \<^bold>\<and> G)"
+    "\<And>G a. P G \<Longrightarrow> P(Atom a \<^bold>\<and> G)" "\<And>G a. P G \<Longrightarrow> P(\<^bold>\<not> (Atom a) \<^bold>\<and> G)"
+  shows "P \<phi>"
+using assms proof (induction \<phi>)
+  case (Not l)
+  then show ?case by (cases l) simp_all
+next
+  case (And F G)
+  then show ?case by (cases F rule: is_lit_plus.cases) simp_all
+qed simp_all
+
+lemma un_and_lits: "is_conj F \<Longrightarrow> \<forall>f \<in> set (un_and F). is_lit_plus f"
+  by (induction F) simp_all
 
 lemma un_and_sem: "A \<Turnstile> F \<longleftrightarrow> (\<forall>f \<in> set (un_and F). A \<Turnstile> f)"
   by (induction F) simp_all
 
-fun is_lit_pos :: "'a formula \<Rightarrow> bool" where
-  "is_lit_pos \<bottom> = True" |
-  "is_lit_pos (Not \<bottom>) = True" |
-  "is_lit_pos (Atom _) = True" |
-  "is_lit_pos _ = False"
-
-lemma lit_pos_vs_plus: "is_lit_pos l = is_lit_plus l \<or> (\<exists>a. l = \<^bold>\<not> (Atom a))"
-  by (cases l rule: is_lit_plus.cases) simp_all
-
-fun is_pos_conj :: "'a formula \<Rightarrow> bool" where
-  "is_pos_conj (F \<^bold>\<and> G) \<longleftrightarrow> is_lit_pos F \<and> is_pos_conj G" |
-  "is_pos_conj F \<longleftrightarrow> is_lit_pos F"
-
-lemma pos_conj_conj: "is_pos_conj F \<Longrightarrow> is_conj F"
-  apply (induction F rule: is_conj.induct) using lit_pos_vs_plus apply force
-  apply simp_all using lit_pos_vs_plus by force
-
-lemma "is_pos_conj F \<Longrightarrow> \<forall>f \<in> set (un_and F). is_lit_pos f"
-  by (induction F rule: is_conj.induct) simp_all
-
-(* This is only defined for pure conjunctive clauses. *)
-(* TODO maybe extend the definition for other use cases? *)
-
-fun relax_lit :: "'a formula \<Rightarrow> 'a formula" where
-  "relax_lit \<bottom> = \<^bold>\<not> \<bottom>" |
-  "relax_lit (\<^bold>\<not> \<bottom>) = \<^bold>\<not> \<bottom>" |
-  "relax_lit (Atom a) = Atom a" |
-  "relax_lit (\<^bold>\<not> (Atom a)) = \<^bold>\<not> \<bottom>"
-
-lemma relax_lit_pos: "is_lit_plus f \<Longrightarrow> is_lit_pos (relax_lit f)"
-  by (cases f rule: relax_lit.cases) simp_all
-
-(* also only defined for is_conj *)
-fun relax_conj :: "'a formula \<Rightarrow> 'a formula" where
-  "relax_conj (F \<^bold>\<and> G) = relax_lit F \<^bold>\<and> relax_conj G" |
-  "relax_conj f = relax_lit f"
-
-
-lemma relax_conj_pos: "is_conj F \<Longrightarrow> is_pos_conj (relax_conj F)"
-  apply (induction F rule: is_conj.induct) apply (simp_all add: relax_lit_pos)
-  subgoal for v apply (cases v) apply simp_all done done
-
-(* can probably think of a stronger property *)
-lemma relax_conj_un_conj:
-  assumes "is_conj F"
-  shows "set (un_and (relax_conj F)) \<subseteq> \<^bold>\<not>\<bottom> \<triangleright> set (un_and F)"
-  using assms proof (induction F rule: is_conj.induct)
-  case (1 F G) thus ?case
-    apply (cases F) apply auto[6] subgoal for x by (cases x) simp_all
-    done
-next
-  case ("2_3" v)
-  then show ?case by (cases v) simp_all
-qed simp_all
-
-lemma relax_conj_sem:
-  assumes "is_conj F"
-  shows "A \<Turnstile> F \<Longrightarrow> A \<Turnstile> relax_conj F"
-proof -
-  have "A \<Turnstile> relax_conj F \<longleftrightarrow> (\<forall>l \<in> set (un_and (relax_conj F)). A \<Turnstile> l)"
-    using un_and_sem by blast
-  hence "(\<forall>l \<in> \<^bold>\<not>\<bottom> \<triangleright> set (un_and F). A \<Turnstile> l) \<Longrightarrow> A \<Turnstile> relax_conj F"
-    using assms using relax_conj_un_conj by blast
-  thus "A \<Turnstile> F \<Longrightarrow> A \<Turnstile> relax_conj F" using un_and_sem by auto
-qed
-
-lemma relax_conj_map:
-  assumes "is_conj F"
-  shows "map_formula m (relax_conj F) = relax_conj (map_formula m F)"
-  using assms proof (induction F)
-  case (Not F)
-  then show ?case by (cases F) simp_all
-next
-  case (And F G) thus ?case
-  proof (cases F)
-    case (Not a)
-    thus ?thesis using And by (cases a) simp_all
-  qed simp_all
-qed simp_all
-
 lemma map_preserves_isconj:
   assumes "is_conj F" shows "is_conj (map_formula m F)"
-using assms proof (induction F)
-  case (Not F)
-  thus ?case by (cases F) simp_all
-next
-  case (And F G) thus ?case
-  proof (cases F)
-    case (Not a)
-    thus ?thesis using And by (cases a) simp_all
-  qed simp_all
-qed simp_all
+using assms by (induction F rule: conj_induct) simp_all
 
 subsection \<open> Formula Semantics \<close>
 
@@ -163,6 +89,114 @@ lemma bigOr_map_atom: "(\<^bold>\<Or>(map ((map_formula \<circ> map_atom) f) \<p
 
 lemma map_formula_bigOr: "(\<^bold>\<Or> (map (map_formula f) \<phi>s)) = map_formula f (\<^bold>\<Or> \<phi>s)"
   by (induction \<phi>s; simp_all)
+
+
+subsection \<open> Conjunction Relaxation \<close>
+
+fun is_pos_lit :: "'a atom formula \<Rightarrow> bool" where
+  f: "is_pos_lit \<bottom> = True" |
+  "is_pos_lit (\<^bold>\<not>\<bottom>) = True" |
+  "is_pos_lit (Atom (predAtm n args)) = True" |
+  "is_pos_lit (\<^bold>\<not>(Atom (predAtm n args))) = False" |
+  "is_pos_lit (Atom (Eq a b)) = True" |
+  "is_pos_lit (\<^bold>\<not>(Atom (Eq a b))) = True" |
+  "is_pos_lit _ = False"
+
+fun is_pos_conj :: "'a atom formula \<Rightarrow> bool" where
+  "is_pos_conj (F \<^bold>\<and> G) \<longleftrightarrow> is_pos_lit F \<and> is_pos_conj G" |
+  "is_pos_conj F \<longleftrightarrow> is_pos_lit F"
+
+lemma conj_induct_atoms [consumes 1, case_names
+    Bot Top Pred NotPred Eq NotEq BotAnd TopAnd PredAnd NotPredAnd EqAnd NotEqAnd]:
+  assumes "is_conj \<phi>"
+    "P \<bottom>" "P (\<^bold>\<not> \<bottom>)" "\<And>n args. P(Atom (predAtm n args))" "\<And>n args. P(\<^bold>\<not>(Atom (predAtm n args)))"
+    "\<And>a b. P (Atom (Eq a b))" "\<And>a b. P (\<^bold>\<not> (Atom (Eq a b)))"
+    
+    "\<And>G. P G \<Longrightarrow> P (\<bottom> \<^bold>\<and> G)" "\<And>G. P G \<Longrightarrow> P (\<^bold>\<not>\<bottom> \<^bold>\<and> G)"
+    "\<And>G n args. P G \<Longrightarrow> P(Atom (predAtm n args) \<^bold>\<and> G)"
+    "\<And>G n args. P G \<Longrightarrow> P(\<^bold>\<not>(Atom (predAtm n args)) \<^bold>\<and> G)"
+    "\<And>G a b. P G \<Longrightarrow> P (Atom (Eq a b) \<^bold>\<and> G)" "\<And>G a b. P G \<Longrightarrow> P (\<^bold>\<not> (Atom (Eq a b)) \<^bold>\<and> G)"
+  shows "P \<phi>"
+using assms proof (induction \<phi>)
+  case (Atom x)
+  thus ?case by (cases x) simp_all
+next
+  case (Not l)
+  thus ?case by (cases l rule: is_pos_lit.cases) simp_all
+next
+  case (And F G)
+  thus ?case by (cases F rule: is_pos_lit.cases) simp_all
+qed simp_all
+
+lemma pos_conj_induct [consumes 1, case_names
+    Bot Top PredAtom Eq NotEq BotAnd TopAnd PredAtomAnd EqAnd NotEqAnd]:
+  assumes "is_pos_conj \<phi>"
+    "P \<bottom>" "P (\<^bold>\<not> \<bottom>)" "\<And>n args. P(Atom (predAtm n args))"
+    "\<And>a b. P (Atom (Eq a b))" "\<And>a b. P (\<^bold>\<not> (Atom (Eq a b)))"
+    
+    "\<And>G. P G \<Longrightarrow> P (\<bottom> \<^bold>\<and> G)" "\<And>G. P G \<Longrightarrow> P (\<^bold>\<not>\<bottom> \<^bold>\<and> G)"
+    "\<And>G n args. P G \<Longrightarrow> P(Atom (predAtm n args) \<^bold>\<and> G)"
+    "\<And>G a b. P G \<Longrightarrow> P (Atom (Eq a b) \<^bold>\<and> G)" "\<And>G a b. P G \<Longrightarrow> P (\<^bold>\<not> (Atom (Eq a b)) \<^bold>\<and> G)"
+  shows "P \<phi>"
+using assms proof (induction \<phi>)
+  case (Atom x)
+  thus ?case by (cases x) simp_all
+next
+  case (Not l)
+  thus ?case by (cases l rule: is_pos_lit.cases) simp_all
+next
+  case (And F G)
+  thus ?case by (cases F rule: is_pos_lit.cases) simp_all
+qed simp_all
+
+lemma pos_conj_conj: "is_pos_conj F \<Longrightarrow> is_conj F"
+  by (induction F rule: pos_conj_induct) simp_all
+
+(* TODO use list_all1 *)
+lemma is_pos_conj_alt: "is_pos_conj F \<longleftrightarrow> (\<forall>l \<in> set (un_and F). is_pos_lit l)"
+  by (induction F) simp_all
+
+(* ? *)
+lemma pos_lit_vs_plus: "is_lit_plus l \<longleftrightarrow> is_pos_lit l \<or> (\<exists>n args. l = \<^bold>\<not>(Atom(predAtm n args)))"
+  by (cases l rule: is_pos_lit.cases) simp_all
+
+text\<open> formula relaxation. Not in Formula_Utils because it uses PDDL atoms. \<close>
+
+(* expects is_lit_plus *)
+fun relax_lit :: "'a atom formula \<Rightarrow> 'a atom formula" where
+  "relax_lit (\<^bold>\<not>(Atom (predAtm n args))) = \<^bold>\<not>\<bottom>" |
+  "relax_lit l = l"
+(* expects is_conj *)
+fun relax_conj :: "'a atom formula \<Rightarrow> 'a atom formula" where
+  "relax_conj (F \<^bold>\<and> G) = relax_lit F \<^bold>\<and> relax_conj G" |
+  "relax_conj f = relax_lit f"
+
+lemma relax_conj_un_and: "un_and (relax_conj F) = map relax_lit (un_and F)"
+  apply (induction F) apply auto
+  subgoal for F apply (cases F rule: is_pos_lit.cases)
+    by auto
+  done
+
+lemma relax_lit_pos: "is_lit_plus f \<Longrightarrow> is_pos_lit (relax_lit f)"
+  by (cases f rule: is_pos_lit.cases) simp_all
+
+lemma relax_conj_pos: "is_conj F \<Longrightarrow> is_pos_conj (relax_conj F)"
+  by (induction F rule: conj_induct_atoms) simp_all
+
+lemma relax_lit_sem: "A \<Turnstile> l \<Longrightarrow> A \<Turnstile> relax_lit l"
+  by (cases l rule: relax_lit.cases) simp_all
+
+lemma relax_conj_sem:
+  shows "A \<Turnstile> F \<Longrightarrow> A \<Turnstile> relax_conj F"
+  unfolding un_and_sem[of _ F] un_and_sem[of _ "relax_conj F"] relax_conj_un_and
+  using relax_lit_sem by auto
+
+(* todo use map_atom_formula *)
+lemma relax_conj_map:
+  assumes "is_conj F"
+  shows "(map_formula \<circ> map_atom) m (relax_conj F) =
+    relax_conj ((map_formula \<circ> map_atom) m F)"
+  using assms by (induction F rule: conj_induct_atoms) simp_all
 
 subsection \<open> STRIPS Formulas \<close>
 

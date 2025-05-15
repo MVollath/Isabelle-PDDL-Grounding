@@ -42,12 +42,12 @@ lemma eq_contr: "(a = b \<Longrightarrow> False) \<Longrightarrow> a \<noteq> b"
 (* lists *)
 
 (* Saves a a line or two sometimes *)
-lemma list_induct_n [case_names nil suc]:
+lemma list_induct_n [consumes 1, case_names Nil Suc]:
   assumes "length xs = n" "P [] 0"
   "\<And>x xs n. length xs = n \<Longrightarrow>
   P xs n \<Longrightarrow> P (x # xs) (Suc n)" shows "P xs n"
 using assms proof (induction xs arbitrary: n)
-  case (Cons x xs n)
+  case (Cons x xs)
   thus ?case by (cases n) simp_all
 qed simp
 
@@ -128,10 +128,12 @@ lemma map2_dist_2:
 
   thus ?case apply (induction xs ys rule: list_induct2') oops
 
-
 lemma drop_prefix:
   assumes "length xs = n" shows "drop n (xs @ ys) = ys"
-  by (induction rule: list_induct_n[OF assms]) simp_all
+using assms proof (induction rule: list_induct_n)
+  case (Suc x xs n) (* explicit just to learn how to use case_names *)
+  then show ?case by simp
+qed simp
 
 (* map_of *)
 

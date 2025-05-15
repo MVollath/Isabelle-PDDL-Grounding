@@ -70,6 +70,9 @@ sublocale normed_prob \<subseteq> normed_dom D
   apply (unfold_locales)
   using normed_prob normed_prob_normed_dom by simp
 
+locale wf_relaxed_normed_prob = wf_ast_problem +
+  assumes relaxed: relaxed_prob and normed: normalized_prob
+
 (* reachability definitions *)
 
 definition (in ast_problem) applicable :: "plan_action \<Rightarrow> bool"

@@ -3,7 +3,7 @@ imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
     Utils PDDL_Sema_Supplement Formula_Utils Normalization_Definitions
 begin
 
-term is_conj
+subsection \<open> Relaxation Procedure \<close>
 
 fun relax_eff :: "'a ast_effect \<Rightarrow> 'a ast_effect" where
   "relax_eff (Effect a b) = Effect a []"
@@ -151,15 +151,13 @@ lemma (in ast_domain_rx) rx_wf_eff: "dx.wf_effect = wf_effect"
   done
 
 lemma (in ast_domain) relax_fmla_wf:
-  "is_conj F \<Longrightarrow> wf_fmla tyt F \<Longrightarrow> wf_fmla tyt (relax_conj F)"
-  apply (induction F) apply simp apply simp
-  subgoal for F
-    apply (cases F) apply simp_all
-    done
-  subgoal for F1
-    apply (cases F1) apply simp_all
-    done
-  by simp_all
+  "wf_fmla tyt F \<Longrightarrow> wf_fmla tyt (relax_conj F)"
+  apply (induction F)
+  subgoal for x by (cases x) simp_all
+      apply simp_all
+  subgoal for F by (cases F rule: is_pos_lit.cases) simp_all
+  subgoal for F G by (cases F rule: is_pos_lit.cases) simp_all
+  done
 
 lemma (in ast_domain) relax_eff_wf:
   "wf_effect tyt eff \<Longrightarrow> wf_effect tyt (relax_eff eff)"
@@ -251,24 +249,13 @@ lemma (in - ) relax_cw_entailment:
   shows "M' \<^sup>c\<TTurnstile>\<^sub>= relax_conj \<phi>"
 proof -
   have "valuation M' \<Turnstile> relax_conj \<phi>" if "valuation M \<Turnstile> \<phi>"
-    (* TODO custom induction rule for relax_conj if is_conj *)
-    using that assms(5) apply (induction \<phi> rule: is_conj.induct)
-    subgoal for F G
-      apply (cases F)
-      subgoal for x
-        using assms(3) valuation_def by (cases x) auto
-    apply simp
-      subgoal for x
-        by (cases x) auto
-      by simp_all
-    subgoal for x
-      using assms(3) valuation_def by (cases x) auto
-       apply simp
-    subgoal for x by (cases x) auto
-    by simp_all
-
+    using assms(5,4) that apply (induction \<phi> rule: conj_induct_atoms)
+    using assms(1-3) valuation_def valuation_iff_close_world by auto
   with assms show ?thesis by (simp add: valuation_iff_close_world)
 qed
+
+find_theorems "(?f\<circ> ?g) ?x = ?f ( ?g ( ?x))"
+  
 
 
 lemma (in normed_prob_rx) rx_enabled:
@@ -300,6 +287,7 @@ proof (cases \<pi>)
     using sat unfolding PAction
     unfolding ast_problem.resolve_instantiate.simps a a' apply simp
     unfolding instantiate_action_schema_alt apply simp
+    unfolding o_apply[symmetric, of map_formula]
     unfolding relax_conj_map[OF pre_conj]
     using assms relax_cw_entailment
       by (simp add: map_preserves_isconj pre_conj)

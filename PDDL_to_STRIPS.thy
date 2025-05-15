@@ -3,7 +3,6 @@ theory PDDL_to_STRIPS
     "AI_Planning_Languages_Semantics.Option_Monad_Add"
     PDDL_Sema_Supplement STRIPS_Sema_Supplement Normalization_Definitions
     Utils Formula_Utils (* String_Shenanigans *)
-    "Propositional_Proof_Systems.CNF"
     (* list linorder: *) "HOL-Library.List_Lexorder" "HOL-Library.Char_ord" (* only used to minimize negative variables *)
 begin
 
@@ -23,22 +22,17 @@ text \<open>There are two big differences between normalized ground PDDL and
   seemed easier.
 \<close>
 
-(* converting conj into a clause as list *)
-(* assumes is_conj. TODO Utils *)
-fun as_clause :: "'a formula \<Rightarrow> 'a formula list" where
-  "as_clause (A \<^bold>\<and> B) = A # as_clause B" |
-  "as_clause A = [A]"
-
 definition "v\<^sub>T \<equiv> ''+'' :: name"
 definition "v\<^sub>F \<equiv> ''-'' :: name"
 abbreviation "vpos p \<equiv> CHR ''+'' # predicate.name p"
 abbreviation "vneg p \<equiv> CHR ''-'' # predicate.name p"
 lemmas vb_defs = v\<^sub>T_def v\<^sub>F_def
 
-fun pred_vpos :: "predicate_decl \<Rightarrow> name" where
+text \<open>iceboxed because e.g. "pred_vpos = vpos \<circ> pred" \<close>
+(*fun pred_vpos :: "predicate_decl \<Rightarrow> name" where
   "pred_vpos (PredDecl n args) = vpos n"
 fun pred_vneg :: "predicate_decl \<Rightarrow> name" where
-  "pred_vneg (PredDecl n args) = vneg n"
+  "pred_vneg (PredDecl n args) = vneg n"*)
 
 (* Converting formulas into variables *)
 (* assumes is_lit_plus and not Eq *)
@@ -49,7 +43,7 @@ fun lit_as_var :: "'a atom formula \<Rightarrow> name" where
   "lit_as_var (\<^bold>\<not>(Atom (predAtm n args))) = vneg n"
 
 definition fmla_as_vars :: "'a atom formula \<Rightarrow> name list" where
-  "fmla_as_vars F \<equiv> map lit_as_var (as_clause F)"
+  "fmla_as_vars F \<equiv> map lit_as_var (un_and F)"
 
 fun lit_as_goal :: "'a atom formula \<Rightarrow> (name \<times> bool)" where
   "lit_as_goal \<bottom> = (v\<^sub>F, True)" |
@@ -57,7 +51,7 @@ fun lit_as_goal :: "'a atom formula \<Rightarrow> (name \<times> bool)" where
   "lit_as_goal (Atom (predAtm n args)) = (vpos n, True)" |
   "lit_as_goal (\<^bold>\<not>(Atom (predAtm n args))) = (vpos n, False)"
 
-abbreviation "fmla_as_goals F \<equiv> map lit_as_goal (as_clause F)"
+abbreviation "fmla_as_goals F \<equiv> map lit_as_goal (un_and F)"
 
 (* atm_as_vpos is technically subsumed by lit_as_var *)
 fun atm_as_vpos :: "'a atom formula \<Rightarrow> name" where
@@ -82,8 +76,8 @@ context ast_problem begin
 
 abbreviation "strips_ops \<equiv> map as_strips_op (actions D)"
 
-definition "pos_vars = v\<^sub>T # map pred_vpos (predicates D)"
-definition "neg_vars = v\<^sub>F # map pred_vneg (predicates D)"
+definition "pos_vars = v\<^sub>T # map (vpos \<circ> pred) (predicates D)"
+definition "neg_vars = v\<^sub>F # map (vneg \<circ> pred) (predicates D)"
 abbreviation "strips_vars \<equiv> pos_vars @ neg_vars"
 lemmas vars_defs = pos_vars_def neg_vars_def
 (*
@@ -154,27 +148,25 @@ end text \<open>context ast_problem\<close>
 
 subsection \<open> Formula structures \<close>
 
-(* TODO Utils *)
-lemma as_clause_sem: "A \<Turnstile> F \<longleftrightarrow> (\<forall>a \<in> set (as_clause F). A \<Turnstile> a)"
-  by (induction F) simp_all
-(* ? *)
-lemma as_clause_lits: assumes "is_conj F" shows "list_all1 is_lit_plus (as_clause F)"
-  using assms by (induction F rule: is_conj.induct) simp_all
-fun (in ast_domain) wf_lit where
+context ast_domain begin
+definition "wf_pred n \<equiv> PredDecl n [] \<in> set (predicates D)"
+fun wf_lit where
   "wf_lit \<bottom> = True" |
   "wf_lit (\<^bold>\<not>\<bottom>) = True" |
-  "wf_lit (Atom (predAtm n [])) = (PredDecl n [] \<in> set (predicates D))" |
-  "wf_lit (\<^bold>\<not>(Atom (predAtm n []))) = (PredDecl n [] \<in> set (predicates D))" |
+  "wf_lit (Atom (predAtm n [])) = wf_pred n" |
+  "wf_lit (\<^bold>\<not>(Atom (predAtm n []))) = wf_pred n" |
   "wf_lit _ = False"
-abbreviation (in ast_domain) "wf_lit_atom F \<equiv> wf_lit F \<and> is_predAtom F"
+abbreviation "wf_lit_atom F \<equiv> wf_lit F \<and> is_predAtom F"
 (* ? *)
-lemma (in ast_domain) wf_lit_plus: "wf_lit L \<Longrightarrow> is_lit_plus L"
+lemma wf_lit_plus: "wf_lit L \<Longrightarrow> is_lit_plus L"
   by (cases L rule: wf_lit.cases) simp_all
+end text \<open>context ast_domain\<close>
+
 
 (* technically, also holds in ast_domain but easier to prove here with sig_Some *)
 context wf_ast_domain begin
 lemma wf_predatom_lit:
-  "wf_pred_atom (\<lambda>x. None) (n, args) \<longleftrightarrow> args = [] \<and> PredDecl n [] \<in> set (predicates D)"
+  "wf_pred_atom (\<lambda>x. None) (n, args) \<longleftrightarrow> args = [] \<and> wf_pred n"
   (is "?L \<longleftrightarrow> ?R")
 proof -
   have notypes: "list_all2 (is_of_type (\<lambda>x. None)) vs Ts \<longleftrightarrow> vs = [] \<and> Ts = []" for vs Ts
@@ -185,7 +177,7 @@ proof -
   also have "... \<longleftrightarrow> (sig n = Some [] \<and> args = [])"
     using notypes by metis
   also have "... \<longleftrightarrow> ?R"
-    using sig_Some by blast
+    using sig_Some wf_pred_def by blast
   finally show ?thesis .
 qed
 
@@ -197,16 +189,16 @@ lemma wf_empty_lit:
 
 lemma wf_empty_lits:
   assumes "is_conj F" "wf_fmla (\<lambda>x. None) F"
-  shows "list_all1 wf_lit (as_clause F)"
+  shows "list_all1 wf_lit (un_and F)"
   using assms wf_empty_lit
-  by (induction F rule: as_clause.induct) auto
+  by (induction F) auto
 
 lemma wf_empty_atom:
   assumes "wf_fmla_atom (\<lambda>x. None) L"
-  shows "wf_lit L"
+  shows "wf_lit_atom L"
 proof -
-  from assms have "is_lit_plus L" unfolding wf_fmla_atom_alt
-    by (cases L rule: is_predAtom.cases) simp_all
+  from assms have "is_lit_plus L"
+    by (cases L rule: wf_fmla_atom.cases) simp_all
   with assms show ?thesis using wf_empty_lit unfolding wf_fmla_atom_alt by blast
 qed
 end text \<open>context wf_ast_domain\<close>
@@ -235,7 +227,7 @@ proof -
 qed
 
 lemma (in wf_normed_grounded_problem) wf_pre_lits:
-  assumes "ac \<in> set (actions D)" shows "list_all1 wf_lit (as_clause (ac_pre ac))"
+  assumes "ac \<in> set (actions D)" shows "list_all1 wf_lit (un_and (ac_pre ac))"
 proof -
   have "wf_fmla (\<lambda>x. None) (ac_pre ac)"
     using assms wf_D(7) ac_tyt_empty wf_action_schema_alt by metis
@@ -250,18 +242,18 @@ lemma wf_eff_lits:
   shows "list_all1 wf_lit_atom (adds (ac_eff ac))" (is ?A)
         "list_all1 wf_lit_atom (dels (ac_eff ac))" (is ?B)
   using assms ac_tyt_empty
-  using wf_D(7) wf_action_schema_alt wf_effect_alt wf_empty_atom wf_fmla_atom_alt
+  using wf_D(7) wf_action_schema_alt wf_effect_alt wf_empty_atom
     by metis+
 
 lemma wf_init_lits:
   shows "list_all1 wf_lit_atom (init P)"
-  using wf_empty_atom wf_P(4) wf_fmla_atom_alt
+  using wf_empty_atom wf_P(4)
   unfolding wf_world_model_def objT_empty by blast
 
 end text \<open>context wf_grounded_problem \<close>
 
 lemma (in wf_normed_grounded_problem) wf_goal_lits:
-  "list_all1 wf_lit (as_clause (goal P))"
+  "list_all1 wf_lit (un_and (goal P))"
   using objT_empty wf_P(5) wf_empty_lits normed_prob by auto
 
 subsection \<open> STRIPS task is WF \<close>
@@ -272,30 +264,30 @@ lemma (in ast_problem) wf_lit_covered:
   assumes "wf_lit F"
   shows "lit_as_var F \<in> set strips_vars"
   unfolding vars_defs
-  using assms by (cases F rule: wf_lit.cases) force+
+  using assms wf_pred_def by (cases F rule: wf_lit.cases) force+
 
 lemma (in ast_problem) wf_lit_goal_covered:
   assumes "wf_lit F"
   shows "fst (lit_as_goal F) \<in> set strips_vars"
   unfolding vars_defs
-  using assms by (cases F rule: wf_lit.cases) force+
+  using assms wf_pred_def by (cases F rule: wf_lit.cases) force+
 
 lemma (in ast_problem) wf_lit_atom_covered:
   assumes "wf_lit_atom F" shows
     "atm_as_vpos F \<in> set pos_vars"
     "atm_as_vneg F \<in> set neg_vars"
   unfolding vars_defs
-  using assms apply (cases F rule: wf_lit.cases) apply force+
-  using assms apply (cases F rule: wf_lit.cases) apply force+
+  using assms wf_pred_def apply (cases F rule: wf_lit.cases) apply force+
+  using assms wf_pred_def apply (cases F rule: wf_lit.cases) apply force+
   done
 
 lemma (in ast_problem) wf_lits_covered:
-  assumes "list_all1 wf_lit (as_clause F)"
+  assumes "list_all1 wf_lit (un_and F)"
   shows "set (fmla_as_vars F) \<subseteq> set strips_vars"
   using assms wf_lit_covered unfolding fmla_as_vars_def by auto
 
 lemma (in ast_problem) wf_lits_goal_covered:
-  assumes "list_all1 wf_lit (as_clause F)"
+  assumes "list_all1 wf_lit (un_and F)"
   shows "fst ` set (fmla_as_goals F) \<subseteq> set strips_vars"
   using assms wf_lit_goal_covered apply simp
   using image_iff list.set_map subsetI by blast
@@ -408,15 +400,68 @@ sublocale wf_normed_grounded_problem \<subseteq> s: valid_strips as_strips
 
 subsection \<open> STRIPS task semantics are preserved \<close>
 
-
-theorem (in wf_normed_grounded_problem) restore_pddl_plan:
-  assumes "is_serial_solution_for_problem as_strips \<pi>s"
-  shows "valid_plan (restore_pddl_plan \<pi>s)"
+lemma (in wf_grounded_problem)
+  "wf_pred n \<longleftrightarrow> PredDecl n [] \<in> set (predicates D)"
+  "wf_pred n \<longleftrightarrow> n \<in> pred ` set (predicates D)"
+  "wf_pred n \<longleftrightarrow> vpos n \<in> pred_vpos ` set (predicates D)"
+    (* not pos_vars, tho, because n could be '''' and vpos n = v\<^sub>T *)
   oops
 
-theorem (in wf_normed_grounded_problem) valid_plan_iff:
+context ast_problem begin
+(* strips state equivalent *)
+
+term empty_state
+definition strips_model :: "world_model \<Rightarrow> name strips_state" where
+  "strips_model M v \<equiv> undefined"
+
+thm wf_ast_domain.wf_empty_atom (* use this to work with wf_world_model M *)
+lemma strips_model_props:
+  assumes "wf_world_model M"
+    "wf_pred n"
+  shows
+    "strips_init = strips_model I"
+    "strips_model M v\<^sub>T = Some True"
+    "strips_model M v\<^sub>F = Some False"
+    "strips_model M v \<noteq> None \<longleftrightarrow> v \<in> set strips_vars"
+    "strips_model M (vpos n) = Some (Atom (predAtm n []) \<in> M)"
+    "strips_model M (vneg n) = Some (Atom (predAtm n []) \<notin> M)"
+  oops
+
+(* other direction equivalent *)
+
+definition wf_state :: "name strips_state \<Rightarrow> bool" where
+  "wf_state s \<equiv> s v\<^sub>T = Some True \<and>
+    s v\<^sub>F = Some False \<and>
+    (\<forall>v. s v \<noteq> None \<longleftrightarrow> v \<in> set strips_vars) \<and>
+    (\<forall>n b. s (vpos n) = Some b \<longleftrightarrow> s (vneg n) = Some (\<not>b))"
+
+definition pddl_model :: "name strips_state \<Rightarrow> world_model" where
+  "pddl_model s = undefined"
+lemma pddl_model_props:
+  assumes "valid_strips_state s" "wf_pred n"
+  shows "Atom (predAtm n []) \<in> pddl_model s \<longleftrightarrow> s (vpos n) = Some True"
+  oops
+
+
+fun (in ast_domain) strips_pa where
+  "strips_pa (PAction n args) = as_strips_op (the (resolve_action_schema n))"
+
+
+
+theorem (in wf_normed_grounded_problem) valid_plan_right:
+  assumes "valid_plan \<pi>s"
+  shows "is_serial_solution_for_problem as_strips (map strips_pa \<pi>s)"
+  oops
+
+theorem (in wf_normed_grounded_problem) restore_pddl_plan:
+  assumes "is_serial_solution_for_problem as_strips \<pi>s'"
+  shows "valid_plan (restore_pddl_plan \<pi>s')"
+  oops
+
+corollary (in wf_normed_grounded_problem) valid_plan_iff:
   "(\<exists>\<pi>s. valid_plan \<pi>s) \<longleftrightarrow> (\<exists>\<pi>s'. is_serial_solution_for_problem as_strips \<pi>s')"
   oops
 
 
+end text \<open> context ast_problem \<close>
 end
