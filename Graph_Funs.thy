@@ -1,10 +1,11 @@
 theory Graph_Funs
-imports Main
+imports Main "HOL-Library.Monad_Syntax"
 begin
 
+subsection \<open> Enumerating the transitive closure \<close>
+
 (* alternatively, use remdups on each bag at the end *)
-text \<open> the use of conc_unique here is only for performance issues and I probably should
-not have bothered with it.\<close>
+text \<open> the use of conc_unique here is only for performance issues.\<close>
 fun conc_unique :: "'a list \<Rightarrow> 'a list \<Rightarrow> 'a list" where
   "conc_unique [] rs = rs" |
   "conc_unique (l # ls) rs = conc_unique ls (if l \<in> set rs then rs else l # rs)"
@@ -13,7 +14,7 @@ definition upd_bag :: "'a list \<Rightarrow> 'a \<Rightarrow> ('a \<Rightarrow> 
   "upd_bag values key rel \<equiv> rel(key := conc_unique values (rel key))"
 
 definition upd_all where
-  "upd_all rel keys values \<equiv> foldr (upd_bag values) keys rel"
+  "upd_all rel keys values \<equiv> fold (upd_bag values) keys rel"
 (*foldr is easier to prove by induction *)
 
 fun reach_aux :: "('a \<times> 'a) list \<Rightarrow> ('a \<Rightarrow> ('a list)) \<Rightarrow> ('a \<Rightarrow> ('a list)) \<Rightarrow> ('a \<Rightarrow> ('a list))" where
@@ -37,28 +38,6 @@ text \<open> TODO: use mapping instead of lambda! \<close>
 abbreviation reachable_nodes :: "('a \<times> 'a) list \<Rightarrow> 'a \<Rightarrow> 'a list" where
   "reachable_nodes rel \<equiv> reach_aux rel (\<lambda>x. [x]) (\<lambda>x. [x])"
 
-(* the following (unused) functions were programmed before I understood the big problems with allowing constants
-  to have "Either" types *)
-(*
-fun group_bags :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
-  "group_bags f [] = []" |
-  "group_bags f (x # xs) = conc_unique (f x) (group_bags f xs)"
-  
-abbreviation reachable_nodes_froms :: "('a \<times> 'a) list \<Rightarrow> 'a list \<Rightarrow> 'a list" where
-  "reachable_nodes_froms rel xs \<equiv> group_bags (reachable_nodes rel) xs"
-
-abbreviation list_int :: "'a list \<Rightarrow> 'a list \<Rightarrow> 'a list" where
-  "list_int xs ys \<equiv> filter (\<lambda>y. y \<in> set xs) ys"
-
-(* "all" is the universe, it represents the coset of []. *)
-fun intersect_bags :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'b list \<Rightarrow> 'a list \<Rightarrow> 'b list" where
-  "intersect_bags f all [] = all" |
-  "intersect_bags f all (x # xs) = list_int (f x) (intersect_bags f all xs)"
-
-abbreviation common_reachable_nodes :: "('a \<times> 'a) list \<Rightarrow> 'a list \<Rightarrow> 'a list \<Rightarrow> 'a list" where
-  "common_reachable_nodes rel all xs \<equiv>
-    intersect_bags (reachable_nodes rel) all xs"*)
-
 (* ---------------- PROOFS ------------------- *)
 
 lemma conc_unique_un:
@@ -66,43 +45,12 @@ lemma conc_unique_un:
   apply (induction xs arbitrary: ys)
   by auto
 
-(*lemma group_bags_un:
-  "set (group_bags f xs) = \<Union>{set (f x) | x. x \<in> set xs}"
-proof (induction xs)
-  case (Cons a as)
-  have "set (group_bags f (a#as)) = set (conc_unique (f a) (group_bags f as))"
-    by simp
-  also have "... = set (f a) \<union> \<Union>{set (f x) | x. x \<in> set as}" using Cons conc_unique_un by metis
-  finally show ?case by auto
-qed simp
-
-lemma list_int_int:
-  "set (list_int xs ys) = set xs \<inter> set ys" by auto
-
-lemma int_bags_int:
-  "set (intersect_bags f all xs) = set all \<inter> \<Inter>{set (f x) | x. x \<in> set xs}"
-proof (induction xs)
-  case (Cons a as)
-  have "set (intersect_bags f all (a#as)) =
-    set (f a) \<inter> (set all \<inter> \<Inter>{set (f x) | x. x \<in> set as})"
-    using Cons list_int_int intersect_bags.simps(2) by metis
-  thus ?case by auto
-qed simp *)
-
-
 definition describes_rel :: "('a \<times> 'a) set \<Rightarrow> ('a \<Rightarrow> 'a list) \<Rightarrow> bool" where
   "describes_rel rel bags \<equiv> \<forall>x y. y \<in> set (bags x) \<longleftrightarrow> (x, y) \<in> rel"
 declare describes_rel_def[simp]
 
 lemma desc_rel_alt: "describes_rel rel bags \<longleftrightarrow> (\<forall>x. set (bags x) = {y. (x, y) \<in> rel})"
   by auto
-
-lemma "describes_rel r f \<Longrightarrow> describes_rel (insert (a, b) r) (f(a:=b # f a))"
-  by simp
-
-value "Pair False True"
-
-lemma "{(a, b) | b. b \<in> bs} = (Pair a) ` bs" by auto
 
 lemma upd_bag_aux:
   assumes "set u = vs \<union> set (f x)"
@@ -114,28 +62,17 @@ lemma upd_bag_correct:
   "describes_rel r f \<Longrightarrow> describes_rel (r \<union> (Pair x) ` set vals) (upd_bag vals x f)"
   using conc_unique_un upd_bag_aux upd_bag_def by metis
 
-
-definition upd_all2 where
-  "upd_all2 r keys vals = fold (upd_bag vals) keys r"
-
-lemma "upd_all r (k#ks) vs = upd_bag vs k (upd_all r ks vs)"
-  unfolding upd_all_def by simp
-
-lemma "upd_all2 r (k#ks) vs = upd_all2 (upd_bag vs k r) ks vs"
-  unfolding upd_all2_def by simp
-
-lemma "Pair x ` vs = {(x, v)|v. v \<in> vs}" by auto
-
+(* TODO *)
 lemma upd_all_correct:
   assumes "describes_rel r f"
   shows "describes_rel (r \<union> {(k, v). k \<in> set ks \<and> v \<in> set vs}) (upd_all f ks vs)"
   using assms
-proof (induction ks)
+proof (induction ks rule: rev_induct)
   case Nil
   thus ?case unfolding upd_all_def by simp
 next
-  case Cons
-  note Cons.IH[OF Cons.prems]
+  case snoc
+  note snoc.IH[OF snoc.prems]
   note upd_bag_correct[OF this]
   thus ?case unfolding upd_all_def by auto
 qed
@@ -143,8 +80,6 @@ qed
 (* TODO use this *)
 lemma "foldr f xs i = fold f (rev xs) i"
   by (metis foldr_conv_fold)
-
-thm rtrancl_insert
 
 lemma rtrancl_insert_elem: "(a, b) \<in> (insert (c, d) rel)\<^sup>* \<longleftrightarrow>
         (a, b) \<in> rel\<^sup>* \<or> ((a, c) \<in> rel\<^sup>* \<and> (d, b) \<in> rel\<^sup>*)"
@@ -243,32 +178,177 @@ proof -
   finally show ?thesis .
 qed
 
-(* artifact from when I misunderstood Either types *)
-(*
-lemma reachable_iff_any_in_star:
-  "y \<in> set (reachable_nodes_froms rel xs) \<longleftrightarrow>
-    (\<exists>x \<in> set xs. (x, y) \<in> (set rel)\<^sup>* )"
+lemma conc_unique_dist:
+  assumes "distinct ys"
+  shows "distinct (conc_unique xs ys)"
+  using assms by (induction xs arbitrary: ys) auto
+
+lemma upd_bag_dist:
+  assumes "distinct (rel x)"
+  shows "distinct ((upd_bag values key rel) x)"
+  using assms conc_unique_dist unfolding upd_bag_def by auto
+
+lemma upd_bags_dist:
+  assumes "distinct (rel x)"
+  shows "distinct ((upd_all rel keys values) x)"
+  unfolding upd_all_def
+  using assms apply (induction keys rule: rev_induct)
+  apply simp using upd_bag_dist by force
+
+lemma reach_aux_dist:
+  assumes "distinct (L x)"
+  shows "distinct ((reach_aux rel R L) x)"
+  using assms apply (induction rel R L rule: reach_aux.induct)
+  apply simp unfolding reach_aux.simps Let_def using upd_bags_dist by fast
+
+lemma reachable_dis: "distinct (reachable_nodes rel x)"
+  using reach_aux_dist[of "\<lambda>x. [x]"] by fastforce
+
+subsection \<open> All combinations, i.e. cartesian powers \<close>
+
+
+text \<open> all valid combinations \<close>
+
+text \<open>There are n (length vals) slots, each with a list of possible values (vals[i]).
+  A testing function (f) takes in a list of length n and checks whether the
+  combination is valid.\<close>
+
+fun nxt :: "'a list list \<Rightarrow> 'a list list \<Rightarrow> 'a list list option" where
+  "nxt [] [] = None" |
+  "nxt (vs # vss) [] = None" | (*values and curr need same length. may as well be undefined, but termination is harder to prove*)
+  "nxt [] (cs # css) = None" | (*values and curr need same length*)
+  "nxt (vs # vss) ([] # css) = None" | (* all lists in curr are non-empty*)
+  "nxt (vs # vss) ([c] # css) = do {nxs \<leftarrow> nxt vss css; Some (vs # nxs)}" |
+  "nxt (vs # vss) ((c#cs) # css) = Some (cs # css)"
+
+function (sequential) alls :: "('a list \<Rightarrow> bool) \<Rightarrow> 'a list list \<Rightarrow> 'a list list \<Rightarrow> 'a list list \<Rightarrow> 'a list list" where
+  "alls f vals crr accum = 
+    (let look = map hd crr;
+         acc' = (if f look then look # accum else accum) in
+    case nxt vals crr of None \<Rightarrow> acc' |
+         Some nxs \<Rightarrow> alls f vals nxs acc')"
+  by pat_completeness simp
+
+definition all_combos :: "('a list \<Rightarrow> bool) \<Rightarrow> 'a list list \<Rightarrow> 'a list list" where
+  "all_combos f vals \<equiv> if [] \<in> set vals then [] else alls f vals vals []"
+
+
+
+
+(* --------------------- PROOFS ------------------------ *)
+
+text \<open> termination of alls, and induction for nxt \<close>
+
+fun nxt_runs :: "'a list list \<Rightarrow> 'a list list \<Rightarrow> nat" where
+  "nxt_runs [] [] = 0" |
+  "nxt_runs (v # va) [] = 0" | (* illegal *)
+  "nxt_runs [] (v # va) = 0" | (* illegal *)
+  "nxt_runs (vs # vss) (cs # css) = (length cs) + (length vs) * nxt_runs vss css"
+  (* technically, "... = length cs - 1 + length vs * nxt_runs vss css" is enough,
+     and it would model the number of next values. But that only works if "vs \<noteq> [], cs \<noteq> []".
+     If you need a theorem that describes the exact number of next values in a sequence,
+     you'll have to create special cases for [] (or assume valid input). *)
+
+lemma nxt_termination:
+  assumes "nxt vss css = Some nxs"
+  shows "nxt_runs vss nxs < nxt_runs vss css"
+using assms proof (induction vss css arbitrary: nxs rule: nxt.induct)
+  case (5 vs vss c css)
+  then obtain nx where nx: "nxt vss css = Some nx" by fastforce
+  with 5 have lt: "nxt_runs vss nx < nxt_runs vss css" and
+    nxs: "nxs = vs # nx" by simp_all
+  from lt have gt0: "nxt_runs vss css > 0" by simp
+
+  from nxs have "nxt_runs (vs # vss) nxs = nxt_runs (vs # vss) (vs # nx)" by blast
+  also have "... = length vs + length vs * nxt_runs vss nx" by simp
+  also have "... \<le> length vs + length vs * (nxt_runs vss css - 1)" using lt by auto
+  also have "... = length vs * nxt_runs vss css"
+    using gt0 by (metis Suc_diff_1 mult_Suc_right)
+  also have "... < length [c] + length vs * nxt_runs vss css" by simp
+  also have "... = nxt_runs (vs # vss) ([c] # css)" by simp
+  finally show ?case .
+qed auto
+
+text \<open> Using wf_induct to create a more palatable induction rule for nxt.
+  If using wf_induct directly, you'd equivalently have the following cumbersome induction step:
+  "\<And>vals crr. (\<And>nxs. nxt_runs vals nxs < nxt_runs vals crr \<Longrightarrow> P vals nxs) \<Longrightarrow> P vals crr"\<close>
+lemma nxt_induct [case_names Last Step]:
+  assumes "\<And>vals crr. nxt vals crr = None \<Longrightarrow> P vals crr"
+    "\<And>vals crr nxs. nxt vals crr = Some nxs \<Longrightarrow> P vals nxs \<Longrightarrow> P vals crr"
+  shows "P vals crr"
 proof -
-  have "y \<in> set (reachable_nodes_froms rel xs) \<longleftrightarrow>
-    y \<in> \<Union>{set ((reachable_nodes rel) x) | x. x \<in> set xs}" using group_bags_un by metis
-  also have "... \<longleftrightarrow> (\<exists>x \<in> set xs. y \<in> set ((reachable_nodes rel) x))" by auto
-  finally show ?thesis using reachable_iff_in_star by metis
+  let ?m = "measure (case_prod nxt_runs)"
+  have wf: "wf ?m" by simp
+
+  have "(\<And>nxs. nxt_runs vals nxs < nxt_runs vals crr \<Longrightarrow> P vals nxs) \<Longrightarrow> P vals crr"
+    for vals crr
+    using assms nxt_termination by (cases "nxt vals crr") blast+
+  hence "\<And>x. (\<forall>y. (y, x) \<in> ?m \<longrightarrow> (case_prod P) y) \<Longrightarrow> (case_prod P) x"
+    by fastforce
+  with wf have "\<And>x. (case_prod P) x" using wf_induct[of _ "case_prod P"] by blast
+  thus ?thesis by blast
 qed
 
-(* artifact from when I misunderstood Either types *)
-lemma reachable_iff_all_in_star:
-  "y \<in> set (common_reachable_nodes rel all xs) \<longleftrightarrow>
-    y \<in> set all \<and> (\<forall>x \<in> set xs. (x, y) \<in> (set rel)\<^sup>* )"
-proof -
-  have "y \<in> set (common_reachable_nodes rel all xs) \<longleftrightarrow>
-    y \<in> set all \<inter> \<Inter>{set ((reachable_nodes rel) x) | x. x \<in> set xs}" using int_bags_int by metis
-  also have "... \<longleftrightarrow> y \<in> set all \<and> (\<forall>x \<in> set xs. y \<in> set ((reachable_nodes rel) x))" by auto
-  finally show ?thesis using reachable_iff_in_star by metis
-qed *)
+termination alls proof
+  let ?m = "measure (\<lambda>(f, vals, crr, accum). nxt_runs vals crr)"
+  show "wf ?m" by simp
 
-(* if I fail to prove this, I can always use remdups as a crutch *)
-lemma reachable_dis: "distinct (reachable_nodes rel x)" sorry
+  fix f vals crr accum
+  fix nexto look acc' nxs
+  assume "nxt vals crr = Some nxs"
+  hence "nxt_runs vals nxs < nxt_runs vals crr"
+    using nxt_termination by blast
+  thus "((f, vals, nxs, acc'), (f, vals, crr, accum)) \<in> ?m"
+    by simp
+qed
 
 
+
+thm alls.simps
+thm alls.induct
+lemmas xd = alls.induct[of "\<lambda>f vals crr acc. alls f vals crr acc =
+  filter f (alls (\<lambda>x. True) vals crr acc)"]
+
+lemma alls_filters_nxt_sequence:
+  fixes f :: "'a list \<Rightarrow> bool"
+  shows "alls f vals crr [] = filter f (alls (\<lambda>x. True) vals crr [])"
+proof (induction vals crr rule: nxt_induct)
+  case (Step vals crr nxs)
+  then show "alls f vals crr [] = filter f (alls (\<lambda>x. True) vals crr [])"  sorry
+next
+  case (Last vals crr)
+  thus ?case sorry
+qed
+
+
+fun chosen_from :: "'a list list \<Rightarrow> 'a list \<Rightarrow> bool" where
+  "chosen_from [] [] = True" |
+  "chosen_from (vs#vss) [] = False" |
+  "chosen_from [] (x#xs) = False" |
+  "chosen_from (vs#vss) (x#xs) \<longleftrightarrow> x \<in> set vs \<and> chosen_from vss xs"
+
+theorem set_all_combos: "set (all_combos p vals) = {x | x. chosen_from vals x \<and> p x}"
+  sorry
+
+theorem all_combos_dist:
+  assumes "list_all distinct vals"
+  shows "distinct (all_combos p vals)"
+  sorry
+
+(* testing *)
+fun test_sorted :: "nat list \<Rightarrow> bool" where
+  "test_sorted [] = True" |
+  "test_sorted [x] = True" |
+  "test_sorted (x # y # xs) \<longleftrightarrow> x \<le> y \<and> test_sorted (y # xs)"
+
+abbreviation "threes \<equiv> [[],[1,2, 3],[1, 2, 3::nat]]"
+abbreviation "spike cs \<equiv> (nxt threes cs, nxt_runs threes cs,
+  case nxt threes cs of None \<Rightarrow> None | Some s \<Rightarrow> Some (nxt_runs threes s))"
+value "spike
+  [[1], [1,2, 3],[1, 2, 3]]"
+
+value "all_combos test_sorted [[1, 2, 3],[1,2,3],[1, 2, 3::nat]]"
+value "all_combos test_sorted [[1, 2, 3],[1],[1, 2, 3::nat]]"
+value "all_combos (\<lambda>xs. (3::nat) \<in> set xs) [[1, 2, 3],[1,2,3],[1, 2, 3::nat]]"
 
 end

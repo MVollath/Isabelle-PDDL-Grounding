@@ -6,6 +6,11 @@ theory Tests
     (*"AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker" *)
 begin
 
+
+
+
+
+
 section \<open> rightAnd \<close>
 (* unused after all in grounding pipeline *)
 (* Like formula.And but it preserves the conjunct being a right-deep tree. *)
@@ -65,5 +70,32 @@ lemma rightAnd_atoms: "atoms (F \<^bold>\<and>\<^sub>R G) = atoms F \<union> ato
 
 lemma rightAnd_entailment: "\<Gamma> \<TTurnstile> F \<^bold>\<and>\<^sub>R G \<longleftrightarrow> \<Gamma> \<TTurnstile> F \<^bold>\<and> G"
   using entailment_def rightAnd_sem by metis
+
+
+section \<open> How to prove termination \<close>
+
+fun collatz_run :: "nat \<Rightarrow> nat" where
+  "collatz_run n = undefined"
+abbreviation "collatz_meaz \<equiv> measure (\<lambda>(n, i). collatz_run n)"
+
+function (sequential) collatz :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
+  "collatz 0 i = i" |
+  "collatz (Suc 0) i = i" |
+  "collatz n i = (if n mod 2 = 0 then collatz (n div 2) (Suc i) else
+    collatz (3 * n + 1) (Suc i))"
+by pat_completeness auto
+termination proof
+  show "wf collatz_meaz" by simp
+next
+  fix n i assume "Suc (Suc n) mod 2 = 0"
+  hence "collatz_run (Suc (Suc n) div 2) < collatz_run (Suc (Suc n))" sorry
+  thus "((Suc (Suc n) div 2, Suc i), (Suc (Suc n), i)) \<in> collatz_meaz"
+    unfolding in_measure by simp
+next
+  fix n i assume "Suc (Suc n) mod 2 \<noteq> 0"
+  hence "collatz_run (3 * Suc (Suc n) + 1) < collatz_run (Suc (Suc n))" sorry
+  thus "((3 * Suc (Suc n) + 1, Suc i), (Suc (Suc n), i))
+       \<in> collatz_meaz" by simp
+qed
 
 end

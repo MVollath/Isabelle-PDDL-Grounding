@@ -16,6 +16,7 @@ type_synonym dl_id = "(name, name) id"
 type_synonym dl_rh = "(name, name, name) rh"
 type_synonym dl_clause = "(name, name, name) Datalog.clause"
 type_synonym name_dl_program = "(name, name, name) dl_program"
+type_synonym dl_sol = "(name, name) pred_val"
 
 abbreviation (input) "pname p \<equiv> CHR ''P'' # predicate.name p"
 abbreviation (input) "aname n \<equiv> CHR ''A'' # n"
@@ -44,7 +45,7 @@ fun lit_rh :: "term atom formula \<Rightarrow> dl_rh" where
   "lit_rh (\<^bold>\<not>\<bottom>) = \<^bold>+ tname []" |
   "lit_rh (Atom (predAtm n args)) = \<^bold>+ (pname n) (p_args args)" |
   "lit_rh (Atom (Eq a b)) = p_arg a \<^bold>= p_arg b" |
-  "lit_rh (\<^bold>\<not> (Atom (Eq a b))) = p_arg a \<^bold>\<noteq> p_arg b" (* not yet supported btw *)
+  "lit_rh (\<^bold>\<not> (Atom (Eq a b))) = p_arg a \<^bold>\<noteq> p_arg b"
 
 (* expects is_pos_conj *)
 definition pre_clauses :: "term atom formula \<Rightarrow> dl_rh list" where
@@ -74,6 +75,8 @@ definition reachability_program :: "name_dl_program" where
   "reachability_program \<equiv> set reach_clauses"
 
 lemmas reach_program_defs = reach_clauses_def reachability_program_def
+
+
 
 
 end
