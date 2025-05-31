@@ -1,9 +1,12 @@
 theory Pseudo_Datalog
   imports PDDL_Sema_Supplement Normalization_Definitions
     Formula_Utils Graph_Funs String_Shenanigans
+    (*"AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"*)
 begin
 
-term nat_upto
+(* TODO utils *)
+definition to_front :: "'a list \<Rightarrow> nat \<Rightarrow> 'a list" where
+  "to_front xs i = (xs ! i) # (take i xs @ drop (i + 1) xs)"
 
 text \<open>
 Here, reachability analysis is performed directly on the PDDL problem data structure, instead of
@@ -119,9 +122,6 @@ fun all_insts_owa_aux
   "all_insts_owa_aux facts f args (c#c'#cs) = (case fix_to' f c args of Some a' \<Rightarrow>
     concat [all_insts_owa_aux facts f' a' (c'#cs). f' \<leftarrow> facts (unPredAtom c')] | None \<Rightarrow> [])"
 
-definition to_front :: "'a list \<Rightarrow> nat \<Rightarrow> 'a list" where
-  "to_front xs i = (xs ! i) # (take i xs @ drop (i + 1) xs)"
-
 (* Level 4: fix w r i, IF r!i matches w THEN for all j...
   Two checks can fail here: Either the predicate symbols of r!i and w don't match.
   Or their parameters can't be unified, i.e. when w=P(a,b) and r!i=P(x,x) *)
@@ -152,32 +152,60 @@ fun all_insts_of_with :: "object atom formula \<Rightarrow> fact_orga \<Rightarr
   "all_insts_of_with f facts c = concat (map (all_insts_of_with_at f facts c) (nat_range (length (cl_pred_pre c))))"
 
 (* Level 3: fix w r, given args, apply heads *)
-fun all_derivs_of :: "object atom formula \<Rightarrow> fact_orga \<Rightarrow> action_clause \<Rightarrow> object atom formula list" where
-  "all_derivs_of f facts c = [a. args \<leftarrow> all_insts_of_with f facts c, a \<leftarrow> consequence_of c args]"
+fun all_derivs_of :: "object atom formula \<Rightarrow> fact_orga \<Rightarrow> action_clause \<Rightarrow>
+  (plan_action list \<times> object atom formula list)" where
+  "all_derivs_of f facts c = (let all_args = all_insts_of_with f facts c in
+    (map (PAction (cl_name c)) all_args,
+    [a. args \<leftarrow> all_args, a \<leftarrow> consequence_of c args]))"
+
+(* TODO utils *)
+fun (in -) concat2 :: "('a list \<times> 'b list) list \<Rightarrow> ('a list \<times> 'b list)" where
+  "concat2 [] = ([], [])" |
+  "concat2 ((as, bs) # xs) = (case concat2 xs of (A, B) \<Rightarrow> (as @ A, bs @ B))"
 
 (* Level 2: fix w, for r in pred_clauses... *)
 fun all_derivs where
-  "all_derivs f facts = concat (map (all_derivs_of f facts) pred_clauses)"
+  "all_derivs f facts = concat2 (map (all_derivs_of f facts) pred_clauses)"
 
 (* Level 1: for w in working set... *)
 function (sequential) semi_naive_aux where
-  "semi_naive_aux [] facts = facts" |
-  "semi_naive_aux (w#works) facts =
-    (let derivs = all_derivs w facts;
-         news = filter (\<lambda>x. \<not> in_orga x facts) derivs;
-         facts' = update_facts news facts in
-    semi_naive_aux (works @ news) facts')"
-  by (pat_completeness) blast+
+  "semi_naive_aux [] facts calls = (calls, facts)" |
+  "semi_naive_aux (w#works) facts calls =
+    (let derivs = (all_derivs w facts);
+         news = filter (\<lambda>x. \<not> in_orga x facts) (remdups (snd derivs));
+         facts' = update_facts news facts;
+         calls' = fst derivs @ calls in
+    semi_naive_aux (works @ news) facts' calls')"
+  by (pat_completeness) blast+ (* takes a few seconds *)
 termination semi_naive_aux proof
   show "wf undefined" sorry
-  show "\<And>w works facts x xa xb.
+  show "\<And>w works facts calls x xa xb xc.
        x = all_derivs w facts \<Longrightarrow>
-       xa = filter (\<lambda>x. \<not> in_orga x facts) x \<Longrightarrow>
-       xb = update_facts xa facts \<Longrightarrow> ((works @ xa, xb), w # works, facts) \<in> undefined"
+       xa = filter (\<lambda>x. \<not> in_orga x facts) (remdups (snd x)) \<Longrightarrow>
+       xb = update_facts xa facts \<Longrightarrow>
+       xc = fst x @ calls \<Longrightarrow> ((works @ xa, xb, xc), w # works, facts, calls) \<in> undefined"
     sorry
 qed
 
-definition "semi_naive_eval \<equiv> (\<lambda>x. semi_naive_aux x (organize_facts x)) init'"
+(* ugh *)
+definition "letsss w works facts \<equiv> (let derivs = all_derivs w facts;
+         news = filter (\<lambda>x. \<not> in_orga x facts) (remdups (snd derivs));
+         facts' = update_facts news facts in
+         (works @ news, facts', w#news))"
+
+(* nat pattern on the right because Code_Binary_Nat (which is included in PDDL_Checker) will otherwise
+  break it. *)
+fun semi_naive_lim where
+  "semi_naive_lim n [] facts news= ([], facts, news)" |
+  "semi_naive_lim m (w#works) facts news = (case m of 0 \<Rightarrow> (w#works, facts, news) |
+    Suc n \<Rightarrow> (case letsss w works facts of (a, b, c) \<Rightarrow>
+    semi_naive_lim n a b c))"
+
+definition "semi_naive_eval \<equiv> case ((\<lambda>x. semi_naive_aux x (organize_facts x) []) init') of
+  (pactions, facts) \<Rightarrow> (pactions, enumerate_orga facts)"
+
+definition "semi_naive_limm n \<equiv> case semi_naive_lim n init' (organize_facts init') [] of
+  (a, b, c) \<Rightarrow> (c, a, enumerate_orga b)"
 
 end
 
@@ -201,6 +229,10 @@ lemmas pseudo_datalog_code =
   ast_problem.semi_naive_aux.simps
   ast_problem.semi_naive_eval_def
 
+  ast_problem.letsss_def
+  ast_problem.semi_naive_lim.simps
+  ast_problem.semi_naive_limm_def
+
 declare pseudo_datalog_code[code]
 
 abbreviation "as_atom n args \<equiv> Atom (predAtm (Pred n) args)"
@@ -217,20 +249,20 @@ definition "action_move \<equiv> Action_Schema
 definition "action_DE \<equiv> Action_Schema
       ''DE''
       [(Var ''d'', \<omega>), (Var ''e'', \<omega>), (Var ''x'', \<omega>)]
-      (Atom (Eq (var ''d'') (cst ''D'')) \<^bold>\<and> Atom (Eq (var ''e'') (cst ''E'')))
+      (Atom (atom.Eq (var ''d'') (cst ''D'')) \<^bold>\<and> Atom (atom.Eq (var ''e'') (cst ''E'')))
       (Effect [as_atom ''path'' [var ''d'', var ''e'']] [])"
 definition "action_omni \<equiv> Action_Schema
       ''omni''
       [(Var ''where'', \<omega>)]
-      (\<^bold>\<not>(Atom (Eq (var ''where'') (cst ''w''))) \<^bold>\<and>
-      (\<^bold>\<not>(Atom (Eq (var ''where'') (cst ''x''))) \<^bold>\<and>
-      (\<^bold>\<not>(Atom (Eq (var ''where'') (cst ''B''))) \<^bold>\<and>
-       \<^bold>\<not>(Atom (Eq (var ''where'') (cst ''y''))))))
+      (\<^bold>\<not>(Atom (atom.Eq (var ''where'') (cst ''w''))) \<^bold>\<and>
+      (\<^bold>\<not>(Atom (atom.Eq (var ''where'') (cst ''x''))) \<^bold>\<and>
+      (\<^bold>\<not>(Atom (atom.Eq (var ''where'') (cst ''B''))) \<^bold>\<and>
+       \<^bold>\<not>(Atom (atom.Eq (var ''where'') (cst ''y''))))))
       (Effect [as_atom ''at'' [cst ''w'', var ''where'']] [])"
 definition "action_foo \<equiv> Action_Schema
       ''foo''
       [(Var ''a'', \<omega>), (Var ''b'', \<omega>)]
-      (Atom (Eq (var ''a'') (var ''b'')) \<^bold>\<and>
+      (Atom (atom.Eq (var ''a'') (var ''b'')) \<^bold>\<and>
       (as_atom ''at'' [cst ''x'', var ''a'']))
       (Effect [as_atom ''foo'' [var ''a'', var ''b'']] [])"
 
@@ -249,6 +281,18 @@ definition my_prob ("\<Pi>") where "my_prob \<equiv> Problem
    as_atom ''path'' [Obj ''C'', Obj ''A''], as_atom ''at'' [Obj ''w'', Obj ''A'']]
   \<bottom>"
 
+fun lel :: "nat \<Rightarrow> nat" where
+  "lel 0 = 0" |
+  "lel (Suc n) = n + lel n"
+
+term Suc
+value "ast_problem.semi_naive_eval \<Pi>"
+value "ast_problem.semi_naive_limm \<Pi> 1"
+value "ast_problem.semi_naive_limm \<Pi> 2"
+value "ast_problem.semi_naive_limm \<Pi> 3"
+value "ast_problem.semi_naive_limm \<Pi> 40"
+
+(*
 interpretation Pi: ast_problem \<Pi> done
 
 value "Pi.all_finished_paramz (as_action_clause action_foo) [Some (Obj ''A''), None]"
@@ -280,14 +324,14 @@ value "Pi.all_insts_of_with_at facto (organize_facts Pi.init') (as_action_clause
 value "consequence_of (as_action_clause action_move) [Obj ''A'', Obj ''B'', Obj ''C'']"
 value "Pi.all_insts_of_with facto (organize_facts Pi.init') (as_action_clause action_move)"
 value "Pi.all_derivs_of facto (organize_facts Pi.init') (as_action_clause action_move)"
-value "Pi.all_derivs facto (organize_facts Pi.init')"
+value "Pi.all_derivs (as_atom ''at'' [Obj ''x'', Obj ''B'']) (organize_facts Pi.init')"
 value "Pi.enumerate_orga orga0"
 value "Pi.enumerate_orga (update_facts (Pi.all_derivs facto (organize_facts Pi.init'))orga0)"
 value "Pi.enumerate_orga (Pi.semi_naive_eval)"
 
 abbreviation "d1 \<equiv> Pi.all_derivs (as_atom ''path'' [Obj ''A'', Obj ''B'']) orga0"
 value d1
-value "Pi.enumerate_orga (update_facts d1 orga0)"
+value "Pi.enumerate_orga (update_facts d1 orga0)" *)
 
 subsection \<open> Proofs \<close>
 

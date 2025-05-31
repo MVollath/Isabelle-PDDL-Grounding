@@ -1,10 +1,10 @@
 theory Running_Example
   imports Main
+    Grounding_Pipeline
+    PDDL_to_STRIPS
+    Pseudo_Datalog
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"
     PDDL_Checker_Utils
-    Grounding_Pipeline
-    Grounded_PDDL
-    PDDL_to_STRIPS
 begin
 
 subsection \<open> Problem Description \<close>
@@ -89,7 +89,7 @@ definition "op_build_tracks \<equiv> Action_Schema ''lay_tracks''
   (Effect [Atom (predAtm (Pred ''rails'') [term.VAR (Var ''from''), term.VAR (Var ''to'')])] [])"
 
 
-definition "my_actions \<equiv> [op_drive, op_choochoo, op_load, op_unload, op_build_tracks]"
+definition "my_actions \<equiv> [op_drive, op_choochoo, op_load, op_unload]"
 
 definition "my_domain \<equiv> Domain my_types my_preds my_consts my_actions"
 value "my_domain"
@@ -101,8 +101,7 @@ definition "my_objs \<equiv> [
   (Obj ''c3'', Either [''Car'']),
   (Obj ''t'', Either [''Train'']),
   (Obj ''p1'', Either [''Parcel'']),
-  (Obj ''p2'', Either [''Parcel'']),
-  (Obj ''batmobile'', Either [''Batmobile''])
+  (Obj ''p2'', Either [''Parcel''])
 ]"
 
 abbreviation fact_to_atm :: "(name \<times> string list) \<Rightarrow> object atom formula" where
@@ -115,7 +114,6 @@ definition "my_init \<equiv> [
   Atom (predAtm (Pred ''at'') [Obj ''t'', Obj ''E'']),
   Atom (predAtm (Pred ''at'') [Obj ''p1'', Obj ''C'']),
   Atom (predAtm (Pred ''at'') [Obj ''p2'', Obj ''F'']),
-  Atom (predAtm (Pred ''at'') [Obj ''batmobile'', Obj ''D'']),
   Atom (predAtm (Pred ''road'') [Obj ''A'', Obj ''D'']),
   Atom (predAtm (Pred ''road'') [Obj ''B'', Obj ''D'']),
   Atom (predAtm (Pred ''road'') [Obj ''C'', Obj ''D'']),
@@ -124,6 +122,8 @@ definition "my_init \<equiv> [
   Atom (predAtm (Pred ''road'') [Obj ''F'', Obj ''G'']),
   Atom (predAtm (Pred ''road'') [Obj ''G'', Obj ''E''])
 ]"
+(* Atom (predAtm (Pred ''at'') [Obj ''batmobile'', Obj ''D'']) *)
+
 definition "my_goal \<equiv>
   And (Atom (predAtm (Pred ''at'') [Obj ''p1'', Obj ''G'']))
       (Atom (predAtm (Pred ''at'') [Obj ''p2'', Obj ''E'']))"
@@ -136,7 +136,7 @@ lemma wf_d1: "ast_domain.wf_domain my_domain"
 lemma wf_p1: "ast_problem.wf_problem my_problem"
   by (intro wf_problem_intro) eval
 
-subsection \<open> Grounding Experiment \<close>
+(*subsection \<open> Grounding Experiment \<close>
 
 definition "facts \<equiv>  map fact_to_atm [
   (''at'', [''c1'', ''A'']),
@@ -168,7 +168,7 @@ definition "ops \<equiv> [
 
 value "grounder.ground_prob my_problem facts ops"
 
-value "grounder.restore_ground_pa ops (PAction ''0/drive-c1-A-D'' [])"
+value "grounder.restore_ground_pa ops (PAction ''0/drive-c1-A-D'' [])" *)
 
 
 
@@ -299,7 +299,7 @@ definition "my_plan_3 \<equiv> [
   PAction ''0choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
   PAction ''1drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G''],
 
-  PAction ''0Goal_______'' []
+  PAction ''0Goal_____'' []
 ]"
 
 (* if you choose the wrong plan action at one point, this tells you where *)
@@ -338,11 +338,31 @@ lemma wf_p5: "ast_problem.wf_problem my_prob_relaxed"
 lemma "ast_problem.valid_plan my_prob_relaxed my_plan_3"
   by (intro valid_plan_intro[OF wf_p5]) eval
 
+subsection \<open>Reachability Analysis\<close>
+
+definition "my_prob_reachables \<equiv> ast_problem.semi_naive_eval my_prob_relaxed"
+value "my_prob_reachables" (* takes a minute *)
+
+value "ast_problem.all_derivs_of my_prob_relaxed
+  (as_atom ''at'' [Obj ''c1'', Obj ''A''])
+  (organize_facts (ast_problem.init' my_prob_relaxed))
+  (as_action_clause (actions my_dom_relaxed ! 1))"
+
 subsection \<open>Grounding\<close>
+
+(* "P\<^sub>G \<equiv> grounder.ground_prob my_prob_split g_facts g_ops" *)
+
+definition PG ("\<Pi>\<^sub>G") where "PG \<equiv> let reach = my_prob_reachables in
+  grounder.ground_prob my_prob_split
+  (snd reach) (fst reach)"
+
+value "length (fst my_prob_reachables)"
+
+value "\<Pi>\<^sub>G" (* takes a minute *)
 
 value my_prob_split
 
-definition "g_facts \<equiv>  [
+definition "g_facts \<equiv> [
       Atom (predAtm (Pred ''______object'') [Obj ''A'']),
       Atom (predAtm (Pred ''______City'') [Obj ''A'']),
       Atom (predAtm (Pred ''______object'') [Obj ''B'']),
