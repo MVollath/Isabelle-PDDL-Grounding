@@ -1,8 +1,6 @@
 theory Running_Example
   imports Main
     Grounding_Pipeline
-    PDDL_to_STRIPS
-    Pseudo_Datalog
     "AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"
     PDDL_Checker_Utils
 begin

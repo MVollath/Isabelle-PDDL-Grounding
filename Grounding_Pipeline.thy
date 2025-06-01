@@ -1,6 +1,6 @@
 theory Grounding_Pipeline
   imports Type_Normalization Goal_Normalization Precondition_Normalization
-    PDDL_Relaxation Pseudo_Datalog Grounded_PDDL PDDL_to_STRIPS
+    PDDL_Relaxation Reachability_Analysis Grounded_PDDL PDDL_to_STRIPS
 begin
 
 subsection \<open> Important theorems from individual grounding pipeline steps.

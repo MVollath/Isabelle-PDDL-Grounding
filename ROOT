@@ -40,7 +40,7 @@ session Tree_Decomp_Grounding = HOL +
 	Goal_Normalization
 	Precondition_Normalization
 	PDDL_Relaxation
-	Pseudo_Datalog
+	Reachability_Analysis
 	Grounded_PDDL
 	PDDL_to_STRIPS
 	Grounding_Pipeline

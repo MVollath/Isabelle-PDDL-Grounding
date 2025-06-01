@@ -1,4 +1,4 @@
-theory Pseudo_Datalog
+theory Reachability_Analysis
   imports PDDL_Sema_Supplement Normalization_Definitions
     Formula_Utils Graph_Funs String_Utils
     (*"AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"*)
