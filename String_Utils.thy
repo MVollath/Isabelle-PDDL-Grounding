@@ -1,4 +1,4 @@
-theory String_Shenanigans
+theory String_Utils
 imports Main Nat_Show_Utils "HOL-Library.Sublist"
 begin
 
@@ -221,7 +221,7 @@ lemma pad_show_neq:
   shows "padl k (show i) \<noteq> padl k (show j)"
   using assms padl_neq notin_show_nat show_nat_inj by simp
 
-(* TODO pull inner if i neq j out to generalize for when map isn't explicitly used *)
+(* TODO pull inner if i \<noteq> j out to generalize for when map isn't explicitly used *)
 lemma distinct_strings_padded:
   shows "distinct (map (padl k) (distinct_strings n))"
 proof -
@@ -239,17 +239,5 @@ proof -
   qed
   thus ?thesis using distinct_conv_nth by force
 qed
-
-section \<open> useless, ahem, legacy stuff \<close>
-
-
-definition distinctize :: "string list \<Rightarrow> string list \<Rightarrow> string list" where
-  "distinctize blocked new \<equiv>
-    map (append (safe_prefix blocked)) new"
-
-(*lemma distinctize_correct:
-  "disjnt (set blocked) (set (distinctize blocked new))"
-  by (metis (no_types, opaque_lifting) disjnt_iff distinctize_def ex_map_conv safe_prefix_correct)*)
-
 
 end

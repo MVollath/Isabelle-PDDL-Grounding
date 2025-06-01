@@ -152,11 +152,9 @@ qed simp_all
 lemma pos_conj_conj: "is_pos_conj F \<Longrightarrow> is_conj F"
   by (induction F rule: pos_conj_induct) simp_all
 
-(* TODO use list_all1 *)
 lemma is_pos_conj_alt: "is_pos_conj F \<longleftrightarrow> (\<forall>l \<in> set (un_and F). is_pos_lit l)"
   by (induction F) simp_all
 
-(* ? *)
 lemma pos_lit_vs_plus: "is_lit_plus l \<longleftrightarrow> is_pos_lit l \<or> (\<exists>n args. l = \<^bold>\<not>(Atom(predAtm n args)))"
   by (cases l rule: is_pos_lit.cases) simp_all
 

@@ -2,16 +2,14 @@ theory Utils
   imports Main
 begin
 
-(* for testing *)
-definition
-  "showvals f xs \<equiv> map (\<lambda>x. (x, f x)) xs"
+(* for testing and debugging *)
+definition "showvals f xs \<equiv> map (\<lambda>x. (x, f x)) xs"
 
 fun showsteps :: "('a \<Rightarrow> 'b \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> 'b list \<Rightarrow> 'a list" where
   "showsteps f i [] = [i]" |
   "showsteps f i (x # xs) = i # showsteps f (f i x) xs"
 
 (* syntax sugar *)
-
 
 text \<open> Not using the default list_all because it makes proofs cumbersome \<close>
 abbreviation (input) list_all1 where
@@ -41,6 +39,11 @@ lemma eq_contr: "(a = b \<Longrightarrow> False) \<Longrightarrow> a \<noteq> b"
 
 (* lists *)
 
+fun find_index :: "'a \<Rightarrow> 'a list \<rightharpoonup> nat" where
+  "find_index a [] = None" |
+  "find_index a (x # xs) = (if a = x then Some 0
+      else map_option Suc (find_index a xs))"
+
 (* Saves a a line or two sometimes *)
 lemma list_induct_n [consumes 1, case_names Nil Suc]:
   assumes "length xs = n" "P [] 0"
@@ -69,10 +72,14 @@ lemma notin_sublist_until:
   "x \<notin> set (sublist_until xs x)"
   by (induction xs) simp_all
 
+
+(* bringing a list element to the front *)
+definition to_front :: "'a list \<Rightarrow> nat \<Rightarrow> 'a list" where
+  "to_front xs i = (xs ! i) # (take i xs @ drop (i + 1) xs)"
+
 (* map *)
 
-(* TODO just use distinct_map *)
-lemma map_inj_dis:
+lemma map_inj_distinct:
   assumes "distinct xs" "inj f"
   shows "distinct (map f xs)"
   using assms distinct_map subset_inj_on by blast
@@ -187,12 +194,8 @@ lemma (in -) set_image_minus_un:
     "A - B \<union> C = D \<longleftrightarrow> f ` A - f ` B \<union> f ` C = f ` D"
   using assms unfolding inj_on_def by blast+
 
-(* find_index *)
-
-fun find_index :: "'a \<Rightarrow> 'a list \<rightharpoonup> nat" where
-  "find_index a [] = None" |
-  "find_index a (x # xs) = (if a = x then Some 0
-      else map_option Suc (find_index a xs))"
-
+(* Concatenate two lists at once *)
+fun (in -) concat2 :: "('a list \<times> 'b list) list \<Rightarrow> ('a list \<times> 'b list)" where
+  "concat2 xs = (concat (map fst xs), concat (map snd xs))"
 
 end

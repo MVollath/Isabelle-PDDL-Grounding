@@ -1,9 +1,9 @@
 theory PDDL_to_STRIPS
   imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
+    "Verified_SAT_Based_AI_Planning.STRIPS_Semantics"
     "AI_Planning_Languages_Semantics.Option_Monad_Add"
     PDDL_Sema_Supplement STRIPS_Sema_Supplement Normalization_Definitions
-    Utils Formula_Utils (* String_Shenanigans *)
-    (* list linorder: *) "HOL-Library.List_Lexorder" "HOL-Library.Char_ord" (* only used to minimize negative variables *)
+    (* list linorder: *) "HOL-Library.List_Lexorder" "HOL-Library.Char_ord" (* only used to minimize negative literals *)
 begin
 
 term "sorted_list_of_set :: string set \<Rightarrow> string list"
@@ -204,7 +204,7 @@ qed
 end text \<open>context wf_ast_domain\<close>
 
 
-context wf_grounded_problem begin
+context grounded_problem begin
 
 lemma constT_empty: "constT = (\<lambda>x. None)"
   using grounded_dom
@@ -226,7 +226,7 @@ proof -
     done
 qed
 
-lemma (in wf_normed_grounded_problem) wf_pre_lits:
+lemma (in grounded_normalized_problem) wf_pre_lits:
   assumes "ac \<in> set (actions D)" shows "list_all1 wf_lit (un_and (ac_pre ac))"
 proof -
   have "wf_fmla (\<lambda>x. None) (ac_pre ac)"
@@ -252,7 +252,7 @@ lemma wf_init_lits:
 
 end text \<open>context wf_grounded_problem \<close>
 
-lemma (in wf_normed_grounded_problem) wf_goal_lits:
+lemma (in grounded_normalized_problem) wf_goal_lits:
   "list_all1 wf_lit (un_and (goal P))"
   using objT_empty wf_P(5) wf_empty_lits normed_prob by auto
 
@@ -294,7 +294,7 @@ lemma (in ast_problem) wf_lits_goal_covered:
 
 end text \<open>context ast_problem \<close>
 
-lemma (in wf_normed_grounded_problem) wf_as_strips_op:
+lemma (in grounded_normalized_problem) wf_as_strips_op:
   assumes "ac \<in> set (actions D)"
   shows "is_valid_operator_strips as_strips (as_strips_op ac)"
 proof -
@@ -361,7 +361,7 @@ proof -
     unfolding as_strips_sel by blast    
 qed
 
-lemma (in wf_grounded_problem) init_covered: "strips_init v \<noteq> None \<longleftrightarrow> v \<in> set strips_vars"
+lemma (in grounded_problem) init_covered: "strips_init v \<noteq> None \<longleftrightarrow> v \<in> set strips_vars"
 proof -
   have "fold (\<lambda>v s. s(v \<mapsto> b)) vars s v \<noteq> None \<longleftrightarrow> v \<in> set vars \<or> s v \<noteq> None"
     for b vars s by (induction vars arbitrary: s) simp_all
@@ -377,7 +377,7 @@ proof -
   ultimately show ?thesis unfolding strips_init_def using empty by blast
 qed
 
-lemma (in wf_normed_grounded_problem) goal_covered:
+lemma (in grounded_normalized_problem) goal_covered:
   assumes "strips_goal v \<noteq> None"
   shows "v \<in> set strips_vars"
 proof -
@@ -388,19 +388,19 @@ proof -
   thus ?thesis using wf_goal_lits wf_lits_goal_covered by blast
 qed
 
-theorem (in wf_normed_grounded_problem) wf_as_strips: "is_valid_problem_strips as_strips"
+theorem (in grounded_normalized_problem) wf_as_strips: "is_valid_problem_strips as_strips"
   unfolding is_valid_problem_strips_def Let_def as_strips_sel
   apply (intro conjI)
   using wf_as_strips_op unfolding Ball_set[symmetric] apply simp
   using init_covered apply (meson ListMem_iff)
   using goal_covered by (meson ListMem_iff)
 
-sublocale wf_normed_grounded_problem \<subseteq> s: valid_strips as_strips
+sublocale grounded_normalized_problem \<subseteq> s: valid_strips as_strips
   using wf_as_strips by unfold_locales
 
 subsection \<open> STRIPS task semantics are preserved \<close>
 
-lemma (in wf_grounded_problem)
+lemma (in grounded_problem)
   "wf_pred n \<longleftrightarrow> PredDecl n [] \<in> set (predicates D)"
   "wf_pred n \<longleftrightarrow> n \<in> pred ` set (predicates D)"
   "wf_pred n \<longleftrightarrow> vpos n \<in> pred_vpos ` set (predicates D)"
@@ -448,17 +448,17 @@ fun (in ast_domain) strips_pa where
 
 
 
-theorem (in wf_normed_grounded_problem) valid_plan_right:
+theorem (in grounded_normalized_problem) valid_plan_right:
   assumes "valid_plan \<pi>s"
   shows "is_serial_solution_for_problem as_strips (map strips_pa \<pi>s)"
   oops
 
-theorem (in wf_normed_grounded_problem) restore_pddl_plan:
+theorem (in grounded_normalized_problem) restore_pddl_plan:
   assumes "is_serial_solution_for_problem as_strips \<pi>s'"
   shows "valid_plan (restore_pddl_plan \<pi>s')"
   oops
 
-corollary (in wf_normed_grounded_problem) valid_plan_iff:
+corollary (in grounded_normalized_problem) valid_plan_iff:
   "(\<exists>\<pi>s. valid_plan \<pi>s) \<longleftrightarrow> (\<exists>\<pi>s'. is_serial_solution_for_problem as_strips \<pi>s')"
   oops
 

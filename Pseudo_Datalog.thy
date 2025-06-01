@@ -1,12 +1,9 @@
 theory Pseudo_Datalog
   imports PDDL_Sema_Supplement Normalization_Definitions
-    Formula_Utils Graph_Funs String_Shenanigans
+    Formula_Utils Graph_Funs String_Utils
     (*"AI_Planning_Languages_Semantics.PDDL_STRIPS_Checker"*)
 begin
 
-(* TODO utils *)
-definition to_front :: "'a list \<Rightarrow> nat \<Rightarrow> 'a list" where
-  "to_front xs i = (xs ! i) # (take i xs @ drop (i + 1) xs)"
 
 text \<open>
 Here, reachability analysis is performed directly on the PDDL problem data structure, instead of
@@ -157,11 +154,6 @@ fun all_derivs_of :: "object atom formula \<Rightarrow> fact_orga \<Rightarrow> 
   "all_derivs_of f facts c = (let all_args = all_insts_of_with f facts c in
     (map (PAction (cl_name c)) all_args,
     [a. args \<leftarrow> all_args, a \<leftarrow> consequence_of c args]))"
-
-(* TODO utils *)
-fun (in -) concat2 :: "('a list \<times> 'b list) list \<Rightarrow> ('a list \<times> 'b list)" where
-  "concat2 [] = ([], [])" |
-  "concat2 ((as, bs) # xs) = (case concat2 xs of (A, B) \<Rightarrow> (as @ A, bs @ B))"
 
 (* Level 2: fix w, for r in pred_clauses... *)
 fun all_derivs where
@@ -341,7 +333,16 @@ lemma "set (un_and xs) = set (pos_lits_of xs) \<union> set (cond_lits_of xs)"
   by auto
 
 
-context wf_relaxed_normed_prob begin
+context relaxed_problem begin
+
+theorem found_facts_achievable:
+  "set (snd semi_naive_eval) = {f. achievable f}"
+  sorry
+
+theorem found_pactions_applicable:
+  "set (fst semi_naive_eval) = {f. applicable f}"
+  sorry
+
 end
 
 

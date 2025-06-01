@@ -1,6 +1,6 @@
 theory Precondition_Normalization
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    PDDL_Sema_Supplement Utils String_Shenanigans DNF Normalization_Definitions
+    Normalization_Definitions String_Utils DNF Normalization_Definitions
 begin
 
 definition "n_clauses ac \<equiv> length (dnf_list (ac_pre ac))"
@@ -161,9 +161,9 @@ theorem (in ast_problem4) prec_normed_ac:
   "\<forall>ac' \<in> set (split_ac ac). is_conj (ac_pre ac')"
   using split_ac_sel(3) dnf_list_conjs by auto
 
-theorem (in ast_problem4) prec_normed_prob:
-  "ast_problem.prec_normed_prob P4"
-  unfolding ast_domain.prec_normed_dom_def split_prob_sel split_dom_sel split_acs_def
+theorem (in ast_problem4) prec_normed_dom:
+  "d4.prec_normed_dom"
+  unfolding d4.prec_normed_dom_def split_prob_sel split_dom_sel split_acs_def
   using prec_normed_ac by simp
 
 subsection \<open> Well-formedness \<close>

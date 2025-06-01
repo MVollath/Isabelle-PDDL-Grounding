@@ -4,8 +4,6 @@ imports
     "Propositional_Proof_Systems.CNF_Formulas"
     "Propositional_Proof_Systems.CNF_Sema"
     "Propositional_Proof_Systems.CNF_Formulas_Sema"
-    "Verified_SAT_Based_AI_Planning.CNF_Supplement"
-    "Verified_SAT_Based_AI_Planning.CNF_Semantics_Supplement"
     Formula_Utils
 begin
 
@@ -148,7 +146,6 @@ lemma cnf_form_atoms:
 lemma neg_of_lit_atoms: "atoms (neg_of_lit l) = atoms (form_of_lit l)"
   by (cases l) simp_all
 
-(* TODO simplify proof *)
 lemma dnf_list_atoms:
   "\<forall>c \<in> set (dnf_list F). atoms c \<subseteq> atoms F"
 proof -

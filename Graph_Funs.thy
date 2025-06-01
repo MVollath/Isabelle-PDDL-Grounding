@@ -206,8 +206,9 @@ lemma reachable_dis: "distinct (reachable_nodes rel x)"
 
 subsection \<open> All combinations, i.e. cartesian powers \<close>
 
-
-text \<open> all valid combinations \<close>
+text \<open> All valid combinations of lists of elements that satisfy a given property.
+  This function is designed to enumerate them, without keeping all of them in memory
+  at once.\<close>
 
 text \<open>There are n (length vals) slots, each with a list of possible values (vals[i]).
   A testing function (f) takes in a list of length n and checks whether the
@@ -221,24 +222,23 @@ fun nxt :: "'a list list \<Rightarrow> 'a list list \<Rightarrow> 'a list list o
   "nxt (vs # vss) ([c] # css) = do {nxs \<leftarrow> nxt vss css; Some (vs # nxs)}" |
   "nxt (vs # vss) ((c#cs) # css) = Some (cs # css)"
 
-(* TODO rename lol *)
-function (sequential) alls :: "('a list \<Rightarrow> bool) \<Rightarrow> 'a list list \<Rightarrow> 'a list list \<Rightarrow> 'a list list \<Rightarrow> 'a list list" where
-  "alls f vals crr accum = 
+function (sequential) all_combos_aux :: "('a list \<Rightarrow> bool) \<Rightarrow> 'a list list \<Rightarrow> 'a list list \<Rightarrow> 'a list list \<Rightarrow> 'a list list" where
+  "all_combos_aux f vals crr accum = 
     (let look = map hd crr;
          acc' = (if f look then look # accum else accum) in
     case nxt vals crr of None \<Rightarrow> acc' |
-         Some nxs \<Rightarrow> alls f vals nxs acc')"
+         Some nxs \<Rightarrow> all_combos_aux f vals nxs acc')"
   by pat_completeness simp
 
 definition all_combos :: "('a list \<Rightarrow> bool) \<Rightarrow> 'a list list \<Rightarrow> 'a list list" where
-  "all_combos f vals \<equiv> if [] \<in> set vals then [] else alls f vals vals []"
+  "all_combos f vals \<equiv> if [] \<in> set vals then [] else all_combos_aux f vals vals []"
 
 
 
 
 (* --------------------- PROOFS ------------------------ *)
 
-text \<open> termination of alls, and induction for nxt \<close>
+text \<open> termination of all_combos_aux, and induction for nxt \<close>
 
 fun nxt_runs :: "'a list list \<Rightarrow> 'a list list \<Rightarrow> nat" where
   "nxt_runs [] [] = 0" |
@@ -290,7 +290,7 @@ proof -
   thus ?thesis by blast
 qed
 
-termination alls proof
+termination all_combos_aux proof
   let ?m = "measure (\<lambda>(f, vals, crr, accum). nxt_runs vals crr)"
   show "wf ?m" by simp
 
@@ -303,50 +303,50 @@ termination alls proof
     by simp
 qed
 
-lemma alls_simps:
-  "nxt vals crr = None \<Longrightarrow> alls f vals crr accum =
+lemma all_combos_aux_simps:
+  "nxt vals crr = None \<Longrightarrow> all_combos_aux f vals crr accum =
     (if f (map hd crr) then map hd crr # accum else accum)"
-  "nxt vals crr = Some nxs \<Longrightarrow> alls f vals crr accum =
-    alls f vals nxs (if f (map hd crr) then map hd crr # accum else accum)"
+  "nxt vals crr = Some nxs \<Longrightarrow> all_combos_aux f vals crr accum =
+    all_combos_aux f vals nxs (if f (map hd crr) then map hd crr # accum else accum)"
    apply simp_all by metis+
 
-declare alls.simps[simp del]
+declare all_combos_aux.simps[simp del]
 
-lemma alls_accum:
-  shows "alls f vals crr (xs @ ys) = alls f vals crr xs @ ys"
+lemma all_combos_accum:
+  shows "all_combos_aux f vals crr (xs @ ys) = all_combos_aux f vals crr xs @ ys"
   apply (induction vals crr arbitrary: xs rule: nxt_induct)
-  unfolding alls_simps apply simp apply (cases "f (map hd crr)"; simp)
+  unfolding all_combos_aux_simps apply simp apply (cases "f (map hd crr)"; simp)
    apply (metis append_Cons)+
   done
 
 abbreviation (input) accept ("\<checkmark>") where "accept \<equiv> \<lambda>_. True"
-lemma accept_alls_simps:
-  "nxt vals crr = None \<Longrightarrow> alls \<checkmark> vals crr [] = [map hd crr]"
-  "nxt vals crr = Some nxs \<Longrightarrow> alls \<checkmark> vals crr [] =
-    alls \<checkmark> vals nxs [] @ [map hd crr]"
-  using alls_simps apply metis
-  unfolding alls_accum[symmetric] using alls_simps by fastforce
+lemma accept_all_combos_simps:
+  "nxt vals crr = None \<Longrightarrow> all_combos_aux \<checkmark> vals crr [] = [map hd crr]"
+  "nxt vals crr = Some nxs \<Longrightarrow> all_combos_aux \<checkmark> vals crr [] =
+    all_combos_aux \<checkmark> vals nxs [] @ [map hd crr]"
+  using all_combos_aux_simps apply metis
+  unfolding all_combos_accum[symmetric] using all_combos_aux_simps by fastforce
 
-lemma alls_filters:
-  shows "alls f vals crr [] = filter f (alls \<checkmark> vals crr [])"
+lemma all_combos_filters:
+  shows "all_combos_aux f vals crr [] = filter f (all_combos_aux \<checkmark> vals crr [])"
 proof (induction vals crr rule: nxt_induct)
   case (Step vals crr nxs)
-  have "alls f vals crr [] = (if f (map hd crr) then alls f vals nxs ([] @ [map hd crr]) else
-    alls f vals nxs [])"
-    using Step alls_simps by fastforce
-  also have "... = (if f (map hd crr) then alls f vals nxs [] @ [map hd crr] else
-    alls f vals nxs [])"
-    using alls_accum by metis
-  also have "... = alls f vals nxs [] @ (if f (map hd crr) then [map hd crr] else [])"
+  have "all_combos_aux f vals crr [] = (if f (map hd crr) then all_combos_aux f vals nxs ([] @ [map hd crr]) else
+    all_combos_aux f vals nxs [])"
+    using Step all_combos_aux_simps by fastforce
+  also have "... = (if f (map hd crr) then all_combos_aux f vals nxs [] @ [map hd crr] else
+    all_combos_aux f vals nxs [])"
+    using all_combos_accum by metis
+  also have "... = all_combos_aux f vals nxs [] @ (if f (map hd crr) then [map hd crr] else [])"
     by simp
-  also have "... = filter f (alls \<checkmark> vals nxs [] @ [map hd crr])"
+  also have "... = filter f (all_combos_aux \<checkmark> vals nxs [] @ [map hd crr])"
     using Step by simp
-  also have "... = filter f (alls \<checkmark> vals crr [])"
-    using Step accept_alls_simps by fastforce
+  also have "... = filter f (all_combos_aux \<checkmark> vals crr [])"
+    using Step accept_all_combos_simps by fastforce
   finally show ?case .
 next
   case (Last vals crr)
-  note alls_simps(1)[OF Last(1)]
+  note all_combos_aux_simps(1)[OF Last(1)]
   thus ?case by simp
 qed
 
@@ -380,102 +380,88 @@ abbreviation "cart_prepend vs xss \<equiv> [v # xs. xs \<leftarrow> xss, v \<lef
   (* \<equiv> concat (map (\<lambda>xs. map (\<lambda>v. v # xs) vs) xss) *)
   (* xss outer, vs inner *)
 
-lemma accept_alls_unroll_digit:
+lemma accept_all_combos_unroll_digit:
   assumes "nxt vals crr = Some nxs" "cs \<noteq> []"
-  shows "alls \<checkmark> (vs # vals) (cs # crr) [] =
-    alls \<checkmark> (vs # vals) (vs # nxs) [] @ [v # map hd crr. v \<leftarrow> rev cs]"
+  shows "all_combos_aux \<checkmark> (vs # vals) (cs # crr) [] =
+    all_combos_aux \<checkmark> (vs # vals) (vs # nxs) [] @ [v # map hd crr. v \<leftarrow> rev cs]"
   using assms(2) proof (induction cs rule: induct_list012)
 case (2 c)
   from assms(1) have "nxt (vs # vals) ([c] # crr) = Some (vs # nxs)" by simp
-  note accept_alls_simps(2)[OF this]
-  hence "alls \<checkmark> (vs # vals) ([c] # crr) [] =
-    alls \<checkmark> (vs # vals) (vs # nxs) [] @ [map hd ([c] # crr)]" by simp
-  also have "... = alls \<checkmark> (vs # vals) (vs # nxs) []
+  note accept_all_combos_simps(2)[OF this]
+  hence "all_combos_aux \<checkmark> (vs # vals) ([c] # crr) [] =
+    all_combos_aux \<checkmark> (vs # vals) (vs # nxs) [] @ [map hd ([c] # crr)]" by simp
+  also have "... = all_combos_aux \<checkmark> (vs # vals) (vs # nxs) []
     @ [v # map hd crr. v \<leftarrow> rev [c]]" by simp
   finally show ?case .
 next
   case (3 d c cs)
-  hence ih: "alls \<checkmark> (vs # vals) ((c # cs) # crr) [] =
-    alls \<checkmark> (vs # vals) (vs # nxs) [] @
+  hence ih: "all_combos_aux \<checkmark> (vs # vals) ((c # cs) # crr) [] =
+    all_combos_aux \<checkmark> (vs # vals) (vs # nxs) [] @
     [v # map hd crr. v \<leftarrow> rev (c # cs)]" by blast
   let ?cs = "d # c # cs"
   have "nxt (vs # vals) (?cs # crr) = Some ((c # cs) # crr)" by simp
-  note accept_alls_simps(2)[OF this]
-  hence "alls \<checkmark> (vs # vals) (?cs # crr) [] =
-    alls \<checkmark> (vs # vals) (vs # nxs) [] @
+  note accept_all_combos_simps(2)[OF this]
+  hence "all_combos_aux \<checkmark> (vs # vals) (?cs # crr) [] =
+    all_combos_aux \<checkmark> (vs # vals) (vs # nxs) [] @
     [v # map hd crr. v \<leftarrow> rev (c # cs)] @ [map hd (?cs # crr)]"
     unfolding ih by simp    
   also have "... =
-     alls \<checkmark> (vs # vals) (vs # nxs) [] @
+     all_combos_aux \<checkmark> (vs # vals) (vs # nxs) [] @
      [v # map hd crr. v \<leftarrow> rev ?cs]" by simp
   finally show ?case .
 qed simp
 
-lemma accept_alls_unroll_digit':
+lemma accept_all_combos_unroll_digit':
   assumes "nxt vals crr = None" "cs \<noteq> []"
-  shows "alls \<checkmark> (vs # vals) (cs # crr) [] =
+  shows "all_combos_aux \<checkmark> (vs # vals) (cs # crr) [] =
     [v # map hd crr. v \<leftarrow> rev cs]"
   using assms(2) proof (induction cs rule: induct_list012)
   case (2 c)
   from assms(1) have "nxt (vs # vals) ([c] # crr) = None" by simp
-  note accept_alls_simps(1)[OF this]
-  hence "alls \<checkmark> (vs # vals) ([c] # crr) [] = [map hd ([c] # crr)]"
+  note accept_all_combos_simps(1)[OF this]
+  hence "all_combos_aux \<checkmark> (vs # vals) ([c] # crr) [] = [map hd ([c] # crr)]"
     by blast
   thus ?case by simp
 next
   case (3 d c cs)
-  hence ih: "alls \<checkmark> (vs # vals) ((c # cs) # crr) [] =
+  hence ih: "all_combos_aux \<checkmark> (vs # vals) ((c # cs) # crr) [] =
     [v # map hd crr. v \<leftarrow> rev (c # cs)]" by blast
   let ?cs = "d # c # cs"
   have "nxt (vs # vals) (?cs # crr) = Some ((c # cs) # crr)" by simp
-  note accept_alls_simps(2)[OF this]
-  hence "alls \<checkmark> (vs # vals) (?cs # crr) [] =
+  note accept_all_combos_simps(2)[OF this]
+  hence "all_combos_aux \<checkmark> (vs # vals) (?cs # crr) [] =
     [v # map hd crr. v \<leftarrow> rev (c # cs)] @ [map hd (?cs # crr)]"
     unfolding ih by simp    
   also have "... = [v # map hd crr. v \<leftarrow> rev ?cs]" by simp
   finally show ?case .
 qed simp
 
-lemma accept_alls_new_digit:
+lemma accept_all_combos_new_digit:
   assumes "valid_vals vals" "valid_crr vals crr" "vs \<noteq> []"
-  shows "alls \<checkmark> (vs # vals) (vs # crr) [] =
-    cart_prepend (rev vs) (alls \<checkmark> vals crr [])"
+  shows "all_combos_aux \<checkmark> (vs # vals) (vs # crr) [] =
+    cart_prepend (rev vs) (all_combos_aux \<checkmark> vals crr [])"
 using assms proof (induction vals crr rule: nxt_induct)
   case (Last vals crr)
-  have "alls \<checkmark> (vs # vals) (vs # crr) [] = [v # map hd crr. v \<leftarrow> rev vs]"
-    using accept_alls_unroll_digit' Last by blast
-  also have "... = cart_prepend (rev vs) (alls \<checkmark> vals crr [])"
-    using accept_alls_simps(1)[OF Last(1)] by simp
+  have "all_combos_aux \<checkmark> (vs # vals) (vs # crr) [] = [v # map hd crr. v \<leftarrow> rev vs]"
+    using accept_all_combos_unroll_digit' Last by blast
+  also have "... = cart_prepend (rev vs) (all_combos_aux \<checkmark> vals crr [])"
+    using accept_all_combos_simps(1)[OF Last(1)] by simp
   finally show ?case .
 next
   case (Step vals crr nxs)
-  have "alls \<checkmark> (vs # vals) (vs # crr) [] =
-    alls \<checkmark> (vs # vals) (vs # nxs) [] @ [v # map hd crr. v \<leftarrow> rev vs]"
-    using accept_alls_unroll_digit Step by blast
-  also have "... = cart_prepend (rev vs) (alls \<checkmark> vals nxs []) @
+  have "all_combos_aux \<checkmark> (vs # vals) (vs # crr) [] =
+    all_combos_aux \<checkmark> (vs # vals) (vs # nxs) [] @ [v # map hd crr. v \<leftarrow> rev vs]"
+    using accept_all_combos_unroll_digit Step by blast
+  also have "... = cart_prepend (rev vs) (all_combos_aux \<checkmark> vals nxs []) @
     [v # map hd crr. v \<leftarrow> rev vs]"
     using Step(2)[OF Step(3) nxt_valid[OF Step(3,4,1)] assms(3)]
     by blast
-  also have "... = cart_prepend (rev vs) (alls \<checkmark> vals nxs [] @ [map hd crr])"
+  also have "... = cart_prepend (rev vs) (all_combos_aux \<checkmark> vals nxs [] @ [map hd crr])"
     by simp
-  also have "... = cart_prepend (rev vs) (alls \<checkmark> vals crr [])"
-    using accept_alls_simps(2)[OF Step(1)] by simp
+  also have "... = cart_prepend (rev vs) (all_combos_aux \<checkmark> vals crr [])"
+    using accept_all_combos_simps(2)[OF Step(1)] by simp
   finally show ?case .
 qed
-  
-value "all_combos \<checkmark> [[2, 3],[4,5::nat]]"
-abbreviation "axs \<equiv> [10,20,30::nat]"
-value "alls \<checkmark> [axs,[2, 3],[4,5::nat]] [axs,[2, 3],[4,5::nat]] []"
-value "alls \<checkmark> [axs,[2, 3],[4,5::nat]] [axs,[3],[4,5::nat]] [] @
-  map (\<lambda>v. v # [2,4]) (rev axs)"
-
-value "all_combos \<checkmark> [[1::nat, 2],[2, 3],[4,5]]"
-value "concat (map (\<lambda>x. map (\<lambda>y. y # x) (rev [1::nat, 2])) (all_combos \<checkmark> [[2,3],[4,5]]))"
-
-value "alls \<checkmark> [[0,1::nat, 2],[2, 3],[4,5]] [[0,1::nat, 2],[3],[4,5]] []"
-value "concat (map (\<lambda>x. map (\<lambda>y. y # x) (rev [0,1::nat, 2])) (alls \<checkmark> [[2,3],[4,5]] [[3],[4,5]] []))"
-
-
 
 fun chosen_from :: "'a list list \<Rightarrow> 'a list \<Rightarrow> bool" where
   "chosen_from [] [] = True" |
@@ -511,7 +497,7 @@ proof -
     unfolding all_combos_def proof (induction vals)
     case Nil
     have "chosen_from [] crr \<longleftrightarrow> crr = []" for crr by (cases crr) simp_all
-    thus ?case by (subst alls.simps) auto
+    thus ?case by (subst all_combos_aux.simps) auto
   next
     case out: (Cons vs vss)
     show ?case
@@ -523,12 +509,12 @@ proof -
         case True thus ?thesis using nothing_to_choose by fastforce
       next
         case False
-        with inn have 1: "alls \<checkmark> (vs # vss) (vs # vss) [] =
-          cart_prepend (rev vs) (alls \<checkmark> vss vss [])"
-          using valid_vals_crr accept_alls_new_digit by fast
-        from False out have 2: "set (alls \<checkmark> vss vss []) = {x. chosen_from vss x}"
+        with inn have 1: "all_combos_aux \<checkmark> (vs # vss) (vs # vss) [] =
+          cart_prepend (rev vs) (all_combos_aux \<checkmark> vss vss [])"
+          using valid_vals_crr accept_all_combos_new_digit by fast
+        from False out have 2: "set (all_combos_aux \<checkmark> vss vss []) = {x. chosen_from vss x}"
           by argo
-        from 1 have "set (alls \<checkmark> (vs # vss) (vs # vss) []) =
+        from 1 have "set (all_combos_aux \<checkmark> (vs # vss) (vs # vss) []) =
           {x. chosen_from (vs # vss) x}"
           using chosen_from_new_digit[OF 2] by simp
         with False inn show ?thesis by simp
@@ -536,13 +522,13 @@ proof -
     qed
   qed
   thus ?thesis
-  unfolding all_combos_def alls_filters[of p] by force
+  unfolding all_combos_def all_combos_filters[of p] by force
 qed
 
 theorem all_combos_dist:
   assumes "list_all distinct vals"
   shows "distinct (all_combos p vals)"
-  sorry
+  oops
 
 
 (* testing *)
@@ -555,33 +541,9 @@ abbreviation "threes \<equiv> [[1,2,3],[1,2, 3],[1, 2, 3::nat]]"
 
 value "nxt threes threes"
 
-abbreviation "spike cs \<equiv> (nxt threes cs, nxt_runs threes cs,
-  case nxt threes cs of None \<Rightarrow> None | Some s \<Rightarrow> Some (nxt_runs threes s))"
-value "spike
-  [[1], [1,2, 3],[1, 2, 3]]"
-
-value "all_combos test_sorted [[1, 2, 3],[1,2,3],[1, 2, 3::nat]]"
-value "all_combos test_sorted [[1, 2, 3],[1],[1, 2, 3::nat]]"
-value "all_combos (\<lambda>xs. (3::nat) \<in> set xs) [[1, 2, 3],[1,2,3],[1, 2, 3::nat]]"
-
-
-(* unrolling *)
-fun has_nxts where
-  "has_nxts vals crr 0 = True" |
-  "has_nxts vals crr (Suc n) \<longleftrightarrow>
-    (case nxt vals crr of None \<Rightarrow> False | Some nxs \<Rightarrow> has_nxts vals crr n)"
-
-fun skip_nxt where
-  "skip_nxt vals crr 0 = crr" |
-  "skip_nxt vals crr (Suc n) = skip_nxt vals (the (nxt vals crr)) n"
-
-fun accall_unroll where
-  "accall_unroll vals crr 0 accum = accum" |
-  "accall_unroll vals crr (Suc n) accum =
-    accall_unroll vals (the (nxt vals crr)) n (map hd crr # accum)"
-
 value "all_combos \<checkmark> threes"
-value "alls \<checkmark> threes (skip_nxt threes threes 12) [] @ accall_unroll threes threes 12 []"
-
+value "all_combos test_sorted threes"
+value "all_combos test_sorted [[1, 2, 3],[1],[1, 2, 3::nat]]"
+value "all_combos (\<lambda>xs. (3::nat) \<in> set xs) threes"
 
 end

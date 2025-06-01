@@ -1,7 +1,7 @@
 theory Grounded_PDDL
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
     PDDL_Sema_Supplement Normalization_Definitions
-    Utils String_Shenanigans
+    Utils String_Utils
 begin
 
 type_synonym facty = "object atom formula" (* maybe fact_atom? *)
@@ -417,7 +417,7 @@ proof -
   have "inj (\<lambda>x. Atom (predAtm x []))"
     by (meson atom.inject(1) formula.inject(1) injI)
   hence "distinct (map ((\<lambda>x. Atom (predAtm x [])) \<circ> (the \<circ> fact_map)) (init P))"
-    using 3 using map_inj_dis by fastforce
+    using 3 using map_inj_distinct by fastforce
 
   thus ?thesis using 0 2 by metis
 qed
@@ -454,11 +454,11 @@ subsection \<open> Semantics \<close>
 
 text \<open> ground locale setup \<close>
 
-sublocale wf_grounder \<subseteq> dg: wf_grounded_domain ground_dom
+sublocale wf_grounder \<subseteq> dg: grounded_domain ground_dom
   using ground_dom_grounded
   by unfold_locales simp
 
-sublocale wf_grounder \<subseteq> pg: wf_grounded_problem ground_prob
+sublocale wf_grounder \<subseteq> pg: grounded_problem ground_prob
   using ground_prob_grounded
   by unfold_locales simp
 
@@ -820,7 +820,7 @@ proof -
 qed
 
 corollary valid_plan_iff:
-  "\<exists>\<pi>s. valid_plan \<pi>s \<longleftrightarrow> (\<exists>\<pi>s'. pg.valid_plan \<pi>s')"
+  "(\<exists>\<pi>s. valid_plan \<pi>s) \<longleftrightarrow> (\<exists>\<pi>s'. pg.valid_plan \<pi>s')"
   using valid_plan_right valid_plan_left by blast
 
 end

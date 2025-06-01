@@ -30,27 +30,27 @@ subsection \<open> Contexts \<close>
 
 text \<open> locale setup for simplified syntax \<close>
 
-(* replace with D\<^sup>+ and P\<^sup>+ *)
+(* TODO replace with D\<^sup>+ and P\<^sup>+ *)
 abbreviation (in ast_domain) (input) "DX \<equiv> relax_dom"
 abbreviation (in ast_problem) (input) "PX \<equiv> relax_prob"
 
 locale ast_domain_rx = ast_domain
 sublocale ast_domain_rx \<subseteq> dx: ast_domain DX .
 
-locale normed_dom_rx = normed_dom
-sublocale normed_dom_rx \<subseteq> dx: ast_domain DX .
+locale normalized_domain_rx = normalized_domain
+sublocale normalized_domain_rx \<subseteq> dx: ast_domain DX .
 (* this is later strengthened to "dx: normed_dom DX" *)
-sublocale normed_dom_rx \<subseteq> ast_domain_rx .
+sublocale normalized_domain_rx \<subseteq> ast_domain_rx .
 
 locale ast_problem_rx = ast_problem
 sublocale ast_problem_rx \<subseteq> px: ast_problem PX .
 sublocale ast_problem_rx \<subseteq> ast_domain_rx D .
 
-locale normed_prob_rx = normed_prob
-sublocale normed_prob_rx \<subseteq> px : ast_problem PX.
+locale normalized_problem_rx = normalized_problem
+sublocale normalized_problem_rx \<subseteq> px : ast_problem PX.
 (* this is later strengthened to "px: normed_prob PX" *)
-sublocale normed_prob_rx \<subseteq> ast_problem_rx .
-sublocale normed_prob_rx \<subseteq> normed_dom_rx D
+sublocale normalized_problem_rx \<subseteq> ast_problem_rx .
+sublocale normalized_problem_rx \<subseteq> normalized_domain_rx D
   by unfold_locales
 
 subsection \<open> Alt definitions \<close>
@@ -97,28 +97,39 @@ lemmas norm_prob_defs =
   ast_problem.normalized_prob_def
   ast_problem.typeless_prob_def
 
-lemma (in normed_dom_rx) rx_acs_typeless:
+lemma (in normalized_domain_rx) rx_acs_typeless:
   "\<forall>ac \<in> set (map relax_ac (actions D)). \<forall>(n, T) \<in> set (ac_params ac). T = \<omega>"
-  using normed_dom unfolding norm_dom_defs by simp
+  using normalized_dom unfolding norm_dom_defs by simp
 
-lemma (in normed_dom_rx) rx_acs_conjs:
-  "\<forall>ac\<in>set (map relax_ac (actions D)). is_conj (ac_pre ac)"
-  using normed_dom unfolding norm_dom_defs
-  using relax_conj_pos[THEN pos_conj_conj] relax_ac_sel(3) relax_dom_sel(4)
+lemma (in normalized_domain_rx) rx_acs_pos_conjs:
+  "\<forall>ac\<in>set (map relax_ac (actions D)). is_pos_conj (ac_pre ac)"
+  using normalized_dom unfolding norm_dom_defs
+  using relax_conj_pos relax_ac_sel(3) relax_dom_sel(4)
   by fastforce
 
-theorem (in normed_dom_rx) relax_dom_normed:
+lemma (in normalized_domain_rx) rx_acs_conjs:
+  "\<forall>ac\<in>set (map relax_ac (actions D)). is_conj (ac_pre ac)"
+  using rx_acs_pos_conjs pos_conj_conj by blast
+
+theorem (in normalized_domain_rx) relax_dom_normed:
   "dx.normalized_dom"
-  using normed_dom
+  using normalized_dom
   unfolding norm_dom_defs relax_dom_sel
   using rx_acs_typeless rx_acs_conjs by simp
 
-theorem (in normed_prob_rx) relax_normed:
+theorem (in normalized_problem_rx) relax_normed:
   "px.normalized_prob"
-  using normed_prob relax_dom_normed
-  unfolding norm_prob_defs ast_domain.normalized_dom_def
+  using normalized_prob relax_dom_normed
+  unfolding ast_domain.normalized_dom_def norm_prob_defs
   unfolding relax_prob_sel
   using relax_conj_pos pos_conj_conj by blast
+
+theorem (in normalized_problem_rx) relax_relaxes:
+  "px.relaxed_prob"
+  using relax_normed normalized_prob
+  unfolding px.relaxed_prob_def norm_prob_defs
+  unfolding relax_prob_sel
+  using relax_conj_pos rx_acs_pos_conjs by auto
 
 subsection \<open> Preserving Well-Formedness \<close>
 
@@ -189,7 +200,7 @@ lemma (in ast_domain_rx) relax_ac_wf:
   using rx_wf_fmla rx_constT relax_fmla_wf apply metis
   using rx_wf_eff rx_constT relax_eff_wf by metis
 
-theorem (in normed_dom_rx) relax_dom_wf:
+theorem (in normalized_domain_rx) relax_dom_wf:
   "dx.wf_domain"
   using wf_domain
   unfolding ast_domain.wf_domain_def
@@ -197,15 +208,15 @@ theorem (in normed_dom_rx) relax_dom_wf:
   unfolding ast_domain.wf_predicate_decl_alt ast_domain.wf_type_alt
   unfolding relax_dom_sel
   using relax_ac_names relax_ac_wf
-  using normed_dom unfolding norm_dom_defs by auto
+  using normalized_dom unfolding norm_dom_defs by auto
 
-lemma (in normed_prob_rx) rx_goal_wf:
+lemma (in normalized_problem_rx) rx_goal_wf:
   "dx.wf_fmla px.objT (relax_conj (goal P))"
   using wf_P(5) rx_objT rx_wf_fmla
-    normed_prob[unfolded norm_prob_defs] ast_domain.relax_fmla_wf
+    normalized_prob[unfolded norm_prob_defs] ast_domain.relax_fmla_wf
   by metis
 
-theorem (in normed_prob_rx) relax_wf:
+theorem (in normalized_problem_rx) relax_wf:
   "px.wf_problem"
   using wf_problem
   unfolding ast_problem.wf_problem_def
@@ -216,23 +227,23 @@ theorem (in normed_prob_rx) relax_wf:
   unfolding ast_problem.wf_world_model_def
   using rx_objT rx_wf_fmla_atom relax_prob_sel(1) apply metis
   using rx_goal_wf by simp
-
-sublocale normed_dom_rx \<subseteq> dx: normed_dom DX
+ 
+sublocale normalized_domain_rx \<subseteq> dx: normalized_domain DX
   apply (unfold_locales)
   using relax_dom_normed relax_dom_wf by simp_all
 
-sublocale normed_prob_rx \<subseteq> px: normed_prob PX
+sublocale normalized_problem_rx \<subseteq> px: normalized_problem PX
   apply (unfold_locales)
   using relax_normed relax_wf by simp_all
 
 subsection \<open> Semantics \<close>
 
-lemma (in normed_dom_rx) rx_resolve:
+lemma (in normalized_domain_rx) rx_resolve:
   assumes "resolve_action_schema n = Some a"
   shows "dx.resolve_action_schema n = Some (relax_ac a)"
   using assms res_aux dx.res_aux by simp
 
-lemma (in normed_dom_rx) rx_resolve':
+lemma (in normalized_domain_rx) rx_resolve':
   assumes "dx.resolve_action_schema n = Some a'"
   obtains a where "resolve_action_schema n = Some a"
   using that assms res_aux dx.res_aux by auto
@@ -258,7 +269,7 @@ find_theorems "(?f\<circ> ?g) ?x = ?f ( ?g ( ?x))"
   
 
 
-lemma (in normed_prob_rx) rx_enabled:
+lemma (in normalized_problem_rx) rx_enabled:
   assumes "wm_basic M" "wm_basic M'" "M \<subseteq> M'" "plan_action_enabled \<pi> M"
   shows "px.plan_action_enabled \<pi> M'"
 proof (cases \<pi>)
@@ -269,7 +280,7 @@ proof (cases \<pi>)
     using rx_resolve by simp
 
   have pre_conj: "is_conj (ac_pre a)"
-    using a normed_dom[unfolded norm_dom_defs] res_aux by fast
+    using a normalized_dom[unfolded norm_dom_defs] res_aux by fast
 
   from assms(4) have wf: "wf_plan_action \<pi>" and
     sat: "M \<^sup>c\<TTurnstile>\<^sub>= precondition (resolve_instantiate \<pi>)"
@@ -299,7 +310,7 @@ lemma (in -) map_effect_alt: "map_ast_effect f e = Effect (map (map_atom_fmla f)
 
 (* technically, it only has to be resolvable for this lemma to hold,
   but using "enabled" is more concise and that's how it's used. *)
-lemma (in normed_prob_rx) rx_exec:
+lemma (in normalized_problem_rx) rx_exec:
   assumes "M \<subseteq> M'" "plan_action_enabled \<pi> M"
   shows "execute_plan_action \<pi> M \<subseteq> px.execute_plan_action \<pi> M'"
   using assms
@@ -319,7 +330,7 @@ proof (cases \<pi>)
     using assms by auto
 qed
 
-lemma (in normed_prob_rx) rx_path_right:
+lemma (in normalized_problem_rx) rx_path_right:
   assumes "M1 \<subseteq> M1'" "plan_action_path M1 \<pi>s M2" "wf_world_model M1" "px.wf_world_model M1'"
   shows "\<exists>M2'. px.plan_action_path M1' \<pi>s M2' \<and> M2 \<subseteq> M2'"
   using assms proof (induction \<pi>s arbitrary: M1 M1')
@@ -342,7 +353,7 @@ lemma (in normed_prob_rx) rx_path_right:
   with C2 show ?case by auto
 qed simp
 
-theorem (in normed_prob_rx) relax_achievables:
+theorem (in normalized_problem_rx) relax_achievables:
   "{a. achievable a} \<subseteq> {a. px.achievable a}"
 proof
   fix a assume "a \<in> {a. achievable a}"
@@ -355,7 +366,7 @@ proof
     using px.achievable_def o(2) by blast
 qed
 
-theorem (in normed_prob_rx) relax_applicables:
+theorem (in normalized_problem_rx) relax_applicables:
   "{\<pi>. applicable \<pi>} \<subseteq> {\<pi>. px.applicable \<pi>}"
 proof
   fix x

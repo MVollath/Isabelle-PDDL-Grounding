@@ -1,7 +1,6 @@
 theory Goal_Normalization
 imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    PDDL_Sema_Supplement PDDL_Instance_Relationships
-    String_Shenanigans Utils DNF
+    PDDL_Sema_Supplement String_Utils Utils DNF
 begin
 
 context ast_domain begin

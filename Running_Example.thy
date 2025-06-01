@@ -101,7 +101,8 @@ definition "my_objs \<equiv> [
   (Obj ''c3'', Either [''Car'']),
   (Obj ''t'', Either [''Train'']),
   (Obj ''p1'', Either [''Parcel'']),
-  (Obj ''p2'', Either [''Parcel''])
+  (Obj ''p2'', Either [''Parcel'']),
+  (Obj ''batmobile'', Either [''Batmobile''])
 ]"
 
 abbreviation fact_to_atm :: "(name \<times> string list) \<Rightarrow> object atom formula" where
@@ -122,6 +123,8 @@ definition "my_init \<equiv> [
   Atom (predAtm (Pred ''road'') [Obj ''F'', Obj ''G'']),
   Atom (predAtm (Pred ''road'') [Obj ''G'', Obj ''E''])
 ]"
+(* purposefully omitting batmobile from init because that would
+  increase the ground problem too much *)
 (* Atom (predAtm (Pred ''at'') [Obj ''batmobile'', Obj ''D'']) *)
 
 definition "my_goal \<equiv>
@@ -135,42 +138,6 @@ lemma wf_d1: "ast_domain.wf_domain my_domain"
 
 lemma wf_p1: "ast_problem.wf_problem my_problem"
   by (intro wf_problem_intro) eval
-
-(*subsection \<open> Grounding Experiment \<close>
-
-definition "facts \<equiv>  map fact_to_atm [
-  (''at'', [''c1'', ''A'']),
-  (''at'', [''c2'', ''B'']),
-  (''at'', [''c3'', ''G'']),
-  (''at'', [''t'', ''E'']),
-  (''at'', [''p1'', ''C'']),
-  (''at'', [''p2'', ''F'']),
-  (''at'', [''batmobile'', ''D'']),
-  (''road'', [''A'', ''D'']),
-  (''road'', [''B'', ''D'']),
-  (''road'', [''C'', ''D'']),
-  (''rails'', [''D'', ''E'']),
-  (''road'', [''E'', ''F'']),
-  (''road'', [''F'', ''G'']),
-  (''road'', [''G'', ''E'']),
-
-  (''at'', [''p1'', ''G'']),
-  (''at'', [''p2'', ''E'']),
-
-  (''at'', [''c1'', ''D'']),
-  (''road'', [''D'', ''A'']),
-  (''at'', [''c1'', ''C''])
-]"
-
-definition "ops \<equiv> [
-  PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']
-]"
-
-value "grounder.ground_prob my_problem facts ops"
-
-value "grounder.restore_ground_pa ops (PAction ''0/drive-c1-A-D'' [])" *)
-
-
 
 subsection \<open> Execution \<close>
 
@@ -192,11 +159,12 @@ definition "my_plan \<equiv> [
 
   PAction ''load'' [Obj ''p1'', Obj ''E'', Obj ''c3''],
   PAction ''drive'' [Obj ''c3'', Obj ''E'', Obj ''G''],
-  PAction ''unload'' [Obj ''p1'', Obj ''c3'', Obj ''G''],
-
-  PAction ''choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
+  PAction ''unload'' [Obj ''p1'', Obj ''c3'', Obj ''G'']
+]"
+(*
+PAction ''choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
   PAction ''drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G'']
-]" (* Just taking the batmobile for a spin at the end, for fun. *)
+Just taking the batmobile for a spin at the end, for fun. *)
 
 value "enab_exec_x my_problem
   (PAction ''drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']) (set my_init)"
@@ -296,11 +264,11 @@ definition "my_plan_3 \<equiv> [
   PAction ''1drive'' [Obj ''c3'', Obj ''E'', Obj ''G''],
   PAction ''0unload'' [Obj ''p1'', Obj ''c3'', Obj ''G''],
 
-  PAction ''0choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
-  PAction ''1drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G''],
-
   PAction ''0Goal_____'' []
 ]"
+
+(* PAction ''choochoo'' [Obj ''batmobile'', Obj ''D'', Obj ''E''],
+  PAction ''drive'' [Obj ''batmobile'', Obj ''E'', Obj ''G''] *)
 
 (* if you choose the wrong plan action at one point, this tells you where *)
 value "valid_plan_x my_prob_split my_plan_3"
@@ -321,12 +289,10 @@ lemma "ast_problem.valid_plan my_problem restored_plan"
   by (intro valid_plan_intro[OF wf_p1]) eval
 
 subsection \<open> PDDL Relaxation \<close>
-(* The only action with impacted preconditions is op_build_tracks *)
-value "actions (my_dom_split) ! 9"
-value "relax_ac (actions (my_dom_split) ! 9)"
-(* and here's a modified effect: *)
-value "actions (my_dom_split) ! 1"
-value "relax_ac (actions (my_dom_split) ! 1)"
+(* The only action with impacted preconditions is op_build_tracks,
+  which I removed because that one blows up grounding. *)
+value "actions (my_dom_split) ! 8"
+value "relax_ac (actions (my_dom_split) ! 8)"
 
 definition "my_dom_relaxed \<equiv> ast_domain.relax_dom my_dom_split"
 definition "my_prob_relaxed \<equiv> ast_problem.relax_prob my_prob_split"
@@ -360,81 +326,11 @@ value "length (fst my_prob_reachables)"
 
 value "\<Pi>\<^sub>G" (* takes a minute *)
 
-value my_prob_split
-
-definition "g_facts \<equiv> [
-      Atom (predAtm (Pred ''______object'') [Obj ''A'']),
-      Atom (predAtm (Pred ''______City'') [Obj ''A'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''B'']),
-      Atom (predAtm (Pred ''______City'') [Obj ''B'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''C'']),
-      Atom (predAtm (Pred ''______City'') [Obj ''C'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''D'']),
-      Atom (predAtm (Pred ''______City'') [Obj ''D'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''E'']),
-      Atom (predAtm (Pred ''______City'') [Obj ''E'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''F'']),
-      Atom (predAtm (Pred ''______City'') [Obj ''F'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''G'']),
-      Atom (predAtm (Pred ''______City'') [Obj ''G'']),
-      Atom (predAtm (Pred ''______Vehicle'') [Obj ''c1'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''c1'']),
-      Atom (predAtm (Pred ''______Movable'') [Obj ''c1'']),
-      Atom (predAtm (Pred ''______Car'') [Obj ''c1'']),
-      Atom (predAtm (Pred ''______Vehicle'') [Obj ''c2'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''c2'']),
-      Atom (predAtm (Pred ''______Movable'') [Obj ''c2'']),
-      Atom (predAtm (Pred ''______Car'') [Obj ''c2'']),
-      Atom (predAtm (Pred ''______Vehicle'') [Obj ''c3'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''c3'']),
-      Atom (predAtm (Pred ''______Movable'') [Obj ''c3'']),
-      Atom (predAtm (Pred ''______Car'') [Obj ''c3'']),
-      Atom (predAtm (Pred ''______Vehicle'') [Obj ''t'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''t'']),
-      Atom (predAtm (Pred ''______Movable'') [Obj ''t'']),
-      Atom (predAtm (Pred ''______Train'') [Obj ''t'']),
-      Atom (predAtm (Pred ''______Movable'') [Obj ''p1'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''p1'']),
-      Atom (predAtm (Pred ''______Parcel'') [Obj ''p1'']),
-      Atom (predAtm (Pred ''______Movable'') [Obj ''p2'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''p2'']),
-      Atom (predAtm (Pred ''______Parcel'') [Obj ''p2'']),
-      Atom (predAtm (Pred ''______Train'') [Obj ''batmobile'']),
-      Atom (predAtm (Pred ''______Car'') [Obj ''batmobile'']),
-      Atom (predAtm (Pred ''______Movable'') [Obj ''batmobile'']),
-      Atom (predAtm (Pred ''______object'') [Obj ''batmobile'']),
-      Atom (predAtm (Pred ''______Vehicle'') [Obj ''batmobile'']),
-      Atom (predAtm (Pred ''______Batmobile'') [Obj ''batmobile'']),
-      Atom (predAtm (Pred ''at'') [Obj ''c1'', Obj ''A'']),
-      Atom (predAtm (Pred ''at'') [Obj ''c2'', Obj ''B'']),
-      Atom (predAtm (Pred ''at'') [Obj ''c3'', Obj ''G'']),
-      Atom (predAtm (Pred ''at'') [Obj ''t'', Obj ''E'']),
-      Atom (predAtm (Pred ''at'') [Obj ''p1'', Obj ''C'']),
-      Atom (predAtm (Pred ''at'') [Obj ''p2'', Obj ''F'']),
-      Atom (predAtm (Pred ''at'') [Obj ''batmobile'', Obj ''D'']),
-      Atom (predAtm (Pred ''road'') [Obj ''A'', Obj ''D'']),
-      Atom (predAtm (Pred ''road'') [Obj ''B'', Obj ''D'']),
-      Atom (predAtm (Pred ''road'') [Obj ''C'', Obj ''D'']),
-      Atom (predAtm (Pred ''rails'') [Obj ''D'', Obj ''E'']),
-      Atom (predAtm (Pred ''road'') [Obj ''E'', Obj ''F'']),
-      Atom (predAtm (Pred ''road'') [Obj ''F'', Obj ''G'']),
-      Atom (predAtm (Pred ''road'') [Obj ''G'', Obj ''E'']),
-      Atom (predAtm (Pred ''Goal____________'') []),
-      Atom (predAtm (Pred ''road'') [Obj ''D'', Obj ''A'']),
-      Atom (predAtm (Pred ''at'') [Obj ''c1'', Obj ''D''])]"
-
-definition "g_ops \<equiv> [
-  PAction ''0drive'' [Obj ''c1'', Obj ''A'', Obj ''D'']
-]"
-
-definition "P\<^sub>G \<equiv> grounder.ground_prob my_prob_split g_facts g_ops"
-value "P\<^sub>G"
-
 (* TO STRIPS *)
 
-definition "P\<^sub>S \<equiv> ast_problem.as_strips P\<^sub>G"
-value "P\<^sub>S"
-value "map (\<lambda>x. (x, initial_of P\<^sub>S x)) (variables_of P\<^sub>S)"
-value "map (\<lambda>x. (x, goal_of P\<^sub>S x)) (variables_of P\<^sub>S)"
+definition P\<^sub>S ("\<Pi>\<^sub>S") where "P\<^sub>S \<equiv> ast_problem.as_strips \<Pi>\<^sub>G"
+value "\<Pi>\<^sub>S" (* takes a minute *)
+value "map (\<lambda>x. (x, initial_of \<Pi>\<^sub>S x)) (variables_of \<Pi>\<^sub>S)"
+value "map (\<lambda>x. (x, goal_of \<Pi>\<^sub>S x)) (variables_of \<Pi>\<^sub>S)"
 
 end

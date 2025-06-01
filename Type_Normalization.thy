@@ -1,44 +1,15 @@
 theory Type_Normalization
   imports "AI_Planning_Languages_Semantics.PDDL_STRIPS_Semantics"
-    PDDL_Sema_Supplement PDDL_Instance_Relationships
-    Formula_Utils Graph_Funs String_Shenanigans Normalization_Definitions
+    Normalization_Definitions Graph_Funs String_Utils
 begin
 
-subsection \<open> Input Restriction \<close>
+subsection \<open>Type Normalization\<close>
 
 text \<open>Even before performing normalization, we place a two restrictions on the input PDDL task.
 * Restrict consts/objects to primitive types only. This greatly simplifies type normalization.
   I couldn't find any PDDL planning task that makes use of constants with Either types, anyway.
 * Ensure that action signature types are well-formed. This not being ensured in wf_domain may be an
   oversight. In practice, PDDL domains should adhere to this, anyway.\<close>
-
-fun single_type :: "type \<Rightarrow> bool" where
-  "single_type (Either ts) \<longleftrightarrow> length ts = 1"
-abbreviation single_types :: "('a \<times> type) list \<Rightarrow> bool" where
-  "single_types os \<equiv> \<forall>(_, T) \<in> set os. single_type T"
-
-(* This being omitted from wf_action_schema is a little annoying for me *)
-definition (in ast_domain) wf_action_params :: "ast_action_schema \<Rightarrow> bool" where
-  "wf_action_params a \<equiv> (\<forall>(n, t) \<in> set (parameters a). wf_type t)"
-
-definition (in ast_domain) restrict_dom :: bool where
-  "restrict_dom \<equiv> single_types (consts D)
-                  \<and> list_all1 wf_action_params (actions D)"
-
-locale restr_domain = wf_ast_domain +
-  assumes restrict_dom: restrict_dom
-
-definition (in ast_problem) restrict_prob :: bool where
-  "restrict_prob \<equiv> restrict_dom
-    \<and> single_types (objects P)"
-
-locale restr_problem = wf_ast_problem +
-  assumes restrict_prob: restrict_prob
-
-sublocale restr_problem \<subseteq> restr_domain "D"
-  using restrict_prob restrict_prob_def by (unfold_locales) simp
-
-subsection \<open>Type Normalization\<close>
 
 context ast_domain
 begin
@@ -133,9 +104,9 @@ locale wf_ast_domain2 = wf_ast_domain
 sublocale wf_ast_domain2 \<subseteq> d2: ast_domain D2 .
 sublocale wf_ast_domain2 \<subseteq> ast_domain2 .
 
-locale restr_domain2 = restr_domain
-sublocale restr_domain2 \<subseteq> d2 : ast_domain D2 .
-sublocale restr_domain2 \<subseteq> wf_ast_domain2
+locale restrict_domain2 = restrict_domain
+sublocale restrict_domain2 \<subseteq> d2 : ast_domain D2 .
+sublocale restrict_domain2 \<subseteq> wf_ast_domain2
   by unfold_locales
 
 locale ast_problem2 = ast_problem
@@ -148,11 +119,11 @@ sublocale wf_ast_problem2 \<subseteq> ast_problem2 .
 sublocale wf_ast_problem2 \<subseteq> wf_ast_domain2 D
   by unfold_locales
 
-locale restr_problem2 = restr_problem
-sublocale restr_problem2 \<subseteq> p2 : ast_problem P2 .
-sublocale restr_problem2 \<subseteq> wf_ast_problem2
+locale restrict_problem2 = restrict_problem
+sublocale restrict_problem2 \<subseteq> p2 : ast_problem P2 .
+sublocale restrict_problem2 \<subseteq> wf_ast_problem2
   by unfold_locales
-sublocale restr_problem2 \<subseteq> restr_domain2 D
+sublocale restrict_problem2 \<subseteq> restrict_domain2 D
   by unfold_locales
 
 text \<open> Alternate/simplified definitions\<close>
@@ -196,15 +167,15 @@ lemma (in ast_problem) detype_prob_sel [simp]:
   using ast_problem.detype_prob_def by simp_all
 
 (* just restrict_dom unfolded *)
-lemma (in restr_domain) restr_D: "single_types (consts D)" "list_all1 wf_action_params (actions D)"
+lemma (in restrict_domain) restrict_D: "single_types (consts D)" "list_all1 wf_action_params (actions D)"
   using restrict_dom restrict_dom_def by auto
 
 (* just restrict_prob unfolded *)
-lemma (in restr_problem) restr_P: "single_types (objects P)"
+lemma (in restrict_problem) restrict_P: "single_types (objects P)"
   using restrict_prob restrict_prob_def by auto
 
-lemma (in restr_problem) single_t_consts: "single_types (all_consts)"
-  using restr_D(1) restr_P(1) by auto
+lemma (in restrict_problem) single_t_consts: "single_types (all_consts)"
+  using restrict_D(1) restrict_P(1) by auto
 
 text \<open> type system \<close>
 
@@ -248,7 +219,7 @@ text \<open> pred_for_type \<close>
   lemma pred_for_type_dis:
     assumes "distinct ts"
     shows "distinct (map pred_for_type ts)"
-    using assms pred_for_type_inj by (rule map_inj_dis)
+    using assms pred_for_type_inj distinct_map subset_inj_on by blast
 
 text \<open> type_preds \<close>
 
@@ -578,7 +549,7 @@ text \<open> detype ac \<close>
   qed
 
   text \<open>Three conditions: 1. distinct parameter names, 2. wf precondition, 3. wf effect\<close>
-  lemma (in restr_domain2) t_ac_wf:
+  lemma (in restrict_domain2) t_ac_wf:
     assumes "a \<in> set (actions D)"
     shows "d2.wf_action_schema (detype_ac a)"
   proof -
@@ -594,7 +565,7 @@ text \<open> detype ac \<close>
 
     from assms have "wf_fmla ?tyt (ac_pre a)" using wfa wf_action_schema_alt by metis
     hence c2b: "d2.wf_fmla ?tyt2 (ac_pre a)" using tyt_om t_fmla_wf by blast
-    have "wf_action_params a" using restr_D(2) assms by simp
+    have "wf_action_params a" using restrict_D(2) assms by simp
     note c2a = t_param_precond_wf[OF this]
     from c2a c2b have c2: "d2.wf_fmla ?tyt2 (ac_pre ?a2)" by simp
 
@@ -605,7 +576,7 @@ text \<open> detype ac \<close>
     from c1 c2 c3 show ?thesis using d2.wf_action_schema_alt by simp
   qed
 
-  lemma (in restr_domain2) t_acs_wf:
+  lemma (in restrict_domain2) t_acs_wf:
     shows "\<forall>a \<in> set (map detype_ac (actions D)). d2.wf_action_schema a"
     using detype_dom_def wf_D t_ac_wf by simp
 
@@ -632,7 +603,7 @@ lemma superfacts_for_cond:
 
   (* unfolding supertype_facts and supertype_facts_for, employing the fact that every const
      has a singular type. *)
-  lemma (in restr_problem) superfacts_unfolded:
+  lemma (in restrict_problem) superfacts_unfolded:
     "supertype_facts all_consts =
       concat (map (\<lambda>(n, T). map (type_atom n) (supertypes_of (get_t T))) all_consts)"
   proof -
@@ -647,7 +618,7 @@ lemma superfacts_for_cond:
 
   (* I could do "p2.wf_world_model (set (supertype_facts_for ent))"
      but it doesn't make it more readable imo. *)
-  lemma (in restr_problem2) super_facts_for_wf:
+  lemma (in restrict_problem2) super_facts_for_wf:
     assumes "(n, T) \<in> set (all_consts)"
     shows "\<forall>\<phi> \<in> set (supertype_facts_for (n, T)). d2.wf_fmla_atom p2.objT \<phi>"
   proof -
@@ -668,7 +639,7 @@ lemma superfacts_for_cond:
     thus ?thesis using superfacts_for_cond t by simp
   qed
 
-  lemma (in restr_problem2) super_facts_wf:
+  lemma (in restrict_problem2) super_facts_wf:
     shows "p2.wf_world_model sf_substate"
     using p2.wf_world_model_def super_facts_for_wf supertype_facts_def by auto
 
@@ -680,7 +651,7 @@ proof -
   with assms co_wm_wf show ?thesis by metis
 qed
 
-lemma (in restr_problem2) t_init_wf:
+lemma (in restrict_problem2) t_init_wf:
   "p2.wf_world_model p2.I"
   using wf_I t_wm_wf super_facts_wf p2.wf_world_model_def by auto
 
@@ -692,21 +663,19 @@ context ast_domain begin
 text \<open> init cond \<close>
 
 (* super simple because of remdups *)
-lemma (in restr_problem) t_init_dis: "distinct (init P2)"
+lemma (in restrict_problem) t_init_dis: "distinct (init P2)"
   by simp
 
-(* if we remove remdups:
-lemma (in restr_problem) "distinct (init P2)"
-  proof -
-  have "distinct (supertype_facts (all_consts))" sorry (* I'm not doing that *)
+(* If I remove remdups
+lemma (in restrict_problem) "distinct (init P2)"
+proof -
+  have "distinct (supertype_facts (all_consts))"
+    using reachable_dis sorry (* I'm not doing that *)
   moreover have "distinct (init P)" using wf_P by simp
-  moreover have "sf_substate \<inter> set (init P) = {}"
-    using wf_P sf_disj_wf_wm by simp
+  moreover have "sf_substate \<inter> set (init P) = {}" sorry
 
   ultimately show ?thesis by simp
-qed *)
-
-
+qed*)
 
 text \<open> goal \<close>
 
@@ -735,7 +704,7 @@ lemma (in wf_ast_problem2) t_goal_wf:
     thus ?thesis using dom_detyped p2.typeless_prob_def detype_prob_def by simp
   qed
 
-  theorem (in restr_domain2) detype_dom_wf:
+  theorem (in restrict_domain2) detype_dom_wf:
     shows "d2.wf_domain"
   proof -
     (* Types are well-formed because they are simply empty. *)
@@ -751,7 +720,7 @@ lemma (in wf_ast_problem2) t_goal_wf:
       using d2.wf_domain_def detype_dom_def by auto
   qed
 
-  theorem (in restr_problem2) detype_prob_wf:
+  theorem (in restrict_problem2) detype_prob_wf:
     shows "p2.wf_problem"
   proof -
     note c1 = detype_dom_wf
@@ -768,10 +737,10 @@ lemma (in wf_ast_problem2) t_goal_wf:
   qed
 end
 
-sublocale restr_domain2 \<subseteq> d2: wf_ast_domain D2
+sublocale restrict_domain2 \<subseteq> d2: wf_ast_domain D2
   using detype_dom_wf wf_ast_domain.intro by simp
 
-sublocale restr_problem2 \<subseteq> p2: wf_ast_problem P2
+sublocale restrict_problem2 \<subseteq> p2: wf_ast_problem P2
   using detype_prob_wf wf_ast_problem.intro by simp
 
 subsubsection \<open> Type Normalization Preserves Semantics \<close>
@@ -846,9 +815,9 @@ proof -
 qed
 end
 
-context restr_problem
+context restrict_problem
 begin
-lemma (in restr_problem2) sf_basic: "wm_basic sf_substate"
+lemma (in restrict_problem2) sf_basic: "wm_basic sf_substate"
   using p2.i_basic unfolding wm_basic_def by simp
 
 lemma typeatm_iff_obj_listed:
@@ -887,7 +856,7 @@ next
     using ot objT_Some single_t_consts tin simple_obj_of_type_iff_fact by blast
 qed
 
-theorem (in restr_problem2) obj_of_type_iff2:
+theorem (in restrict_problem2) obj_of_type_iff2:
   shows "is_obj_of_type n (Either T) \<longleftrightarrow> sf_substate \<^sup>c\<TTurnstile>\<^sub>= \<^bold>\<Or>(map (type_atom n) T)"
 proof -
   have "is_obj_of_type n (Either T) \<longleftrightarrow>
@@ -900,7 +869,7 @@ proof -
   finally show ?thesis by auto
 qed
 
-lemma (in restr_problem2) obj_of_vartype_iff:
+lemma (in restrict_problem2) obj_of_vartype_iff:
   assumes "tsubst (term.VAR v) = n"
   shows "is_obj_of_type n vT \<longleftrightarrow>
     sf_substate \<^sup>c\<TTurnstile>\<^sub>= map_atom_fmla tsubst (type_precond (v, vT))"
@@ -917,7 +886,7 @@ proof -
     by (metis type.exhaust_sel)
 qed
 
-lemma (in restr_problem2) obj_of_vartype_iff2:
+lemma (in restrict_problem2) obj_of_vartype_iff2:
   assumes
     "distinct (map fst params)"
     "params ! i = (v, vT)" "args ! i = n"
@@ -930,7 +899,7 @@ lemma (in restr_problem2) obj_of_vartype_iff2:
 lemma "(b \<Longrightarrow> (c \<longleftrightarrow> d)) \<Longrightarrow> b \<and> c \<longleftrightarrow> b \<and> d" by auto
 
 (* forgive me, father, for I have sinned; TODO: simplify *)
-theorem (in restr_problem2) params_match_iff_type_precond:
+theorem (in restrict_problem2) params_match_iff_type_precond:
   assumes "wf_action_schema ac"
   defines "params \<equiv> ac_params ac"
   shows "action_params_match ac args \<longleftrightarrow>
@@ -979,7 +948,7 @@ end
 
 (* INSTANTIATE STUFF *)
 
-lemma (in restr_problem2) t_resinst:
+lemma (in restrict_problem2) t_resinst:
   assumes "resolve_action_schema n = Some ac"
   shows "d2.resolve_action_schema n = Some (detype_ac ac)"
 proof -
@@ -994,7 +963,7 @@ proof -
     by (simp add: d2.resolve_action_schema_def)
 qed
 
-lemma (in restr_problem2) t_resinst_inv:
+lemma (in restrict_problem2) t_resinst_inv:
   assumes "p2.resolve_action_schema n = Some ac2"
   obtains ac where
     "detype_ac ac = ac2"
@@ -1055,12 +1024,12 @@ proof -
   ultimately show ?thesis by simp
 qed
 
-lemma (in restr_problem) sf_typeatms:
+lemma (in restrict_problem) sf_typeatms:
   assumes "\<psi> \<in> sf_substate"
   shows "\<exists>n t. \<psi> = type_atom n t"
   using assms superfacts_unfolded by auto
 
-lemma (in restr_problem) sf_disj_wf_fmla:
+lemma (in restrict_problem) sf_disj_wf_fmla:
   assumes "wf_fmla tyt \<phi>"
   shows "sf_substate \<inter> Atom ` atoms (map_atom_fmla f \<phi>) = {}"
   using assms sf_typeatms wf_fmla_no_type_patms by fastforce
@@ -1068,7 +1037,7 @@ lemma (in restr_problem) sf_disj_wf_fmla:
 lemma fmla_map_id: "map_atom_fmla id \<phi> = \<phi>"
   by (simp add: atom.map_id0 formula.map_id)
 
-lemma (in restr_problem) sf_disj_wf_fmla0:
+lemma (in restrict_problem) sf_disj_wf_fmla0:
   assumes "wf_fmla tyt \<phi>"
   shows "sf_substate \<inter> Atom ` atoms \<phi> = {}"
   using assms sf_disj_wf_fmla[where f=id] fmla_map_id by metis
@@ -1157,7 +1126,7 @@ lemma (in ast_problem) wf_wm_disj_param_pre:
   using assms wf_wm_no_typeatms param_pre_typeatms by force
 
 (* for wf init, since sf and init don't overlap *)
-lemma (in restr_problem) sf_disj_wf_wm:
+lemma (in restrict_problem) sf_disj_wf_wm:
   assumes "wf_world_model wm"
   shows "sf_substate \<inter> wm = {}"
 proof -
@@ -1168,7 +1137,7 @@ proof -
   thus ?thesis using sf_typeatms by blast
 qed
 
-lemma (in restr_problem) sf_disj_wf_eff:
+lemma (in restrict_problem) sf_disj_wf_eff:
   assumes "wf_effect tyt \<epsilon>"
   shows
     "sf_substate \<inter> set (adds (map_ast_effect f \<epsilon>)) = {}"
@@ -1185,7 +1154,7 @@ end
 hide_fact
   ast_domain.wf_patm_neq_type_patm
   ast_domain.wf_fmla_no_type_patms
-  restr_problem.sf_typeatms
+  restrict_problem.sf_typeatms
   ast_domain.wf_fmla_atom_neq_type_atom
   ast_problem.wf_wm_no_typeatms
   ast_domain.param_pre_typeatms
@@ -1196,7 +1165,7 @@ hide_fact
 
 (* ------ end inclusion/exclusion *)
 
-context restr_problem2
+context restrict_problem2
 begin
 
 lemma t_params_match:
