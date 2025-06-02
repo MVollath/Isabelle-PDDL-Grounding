@@ -3,16 +3,15 @@ A verified Isabelle implementation of the grounder in [Helmert 2009](https://www
 
 ### Dependencies:
 - [AI_Planning_Languages_Semantics](https://www.isa-afp.org/entries/AI_Planning_Languages_Semantics.html): a formalization of PDDL, the input format
- - [Verified_SAT_Based_AI_Planning](https://www.isa-afp.org/entries/Verified_SAT_Based_AI_Planning.html): includes a formalization of propositional STRIPS, the output format
- - [LTS-formalization](https://github.com/anderssch/LTS-formalization): a formalization of Datalog, a language used for reachability analysis. Until I figure out how to do imports better, this has to be in the same folder as my repository, and be named "LTS-formalization".
+- [Verified_SAT_Based_AI_Planning](https://www.isa-afp.org/entries/Verified_SAT_Based_AI_Planning.html): includes a formalization of propositional STRIPS, the output format
 
-### Repository Walkthrough
+### Files
 ```
 Repository
 ├── Documentation
-│   ├── knowledge.md - - - - - - Organized list of sources, many notes
-│   └── project_outline.md - - - Detailed plan of the project
-├── Running_Example.thy  - - - - Full project demonstration
-├── Milestones.thy - - - - - - - Milestone lemmas to gauge the project process
-└── TODO ...
+│   └──thesis.pdf  - - - - - - - The thesis for this project
+├── ROOT - - - - - - - - - - - - The ROOT file defining the Isabelle session
+├── Running_Example.thy  - - - - A full project demonstration
+├── Grounding_Pipeline.thy - - - The central collection of functionality and theorems.
+├── ...  - - - - - - - - - - - - other Isabelle theory files
 ```
