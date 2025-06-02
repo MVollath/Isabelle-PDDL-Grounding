@@ -1,5 +1,5 @@
 # Verified Grounding of PDDL Tasks using Reachability Analysis (and Tree Decomposition)
-A verified Isabelle implementation of the grounder in [Helmert 2009](https://www.sciencedirect.com/science/article/pii/S0004370208001926) for the MVP. The goal is the verification of the improved grounder in [Correa et al 2023](https://ai.dmi.unibas.ch/papers/correa-et-al-icaps2023.pdf).
+A partially verified Isabelle implementation of the grounder in [Helmert 2009](https://www.sciencedirect.com/science/article/pii/S0004370208001926).
 
 ### Dependencies:
 - [AI_Planning_Languages_Semantics](https://www.isa-afp.org/entries/AI_Planning_Languages_Semantics.html): a formalization of PDDL, the input format
